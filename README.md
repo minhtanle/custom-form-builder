@@ -111,7 +111,47 @@ custom-form-builder/
 
 ## 4. Cấu hình & cài đặt
 
-### 4.1 Cài dependency
+### 4.1 Các bước thao tác sau khi clone về
+
+```powershell
+# 1) Clone dự án
+git clone <url-của-repo> custom-form-builder
+cd custom-form-builder
+
+# 2) Cài dependency FE
+npm install
+
+# 3) Cài dependency PHP (bắt buộc nếu dùng validator backend)
+composer --working-dir=php install
+
+# 4) Kiểm tra nhanh: chạy unit test (bắt buộc phải PASS trước khi build)
+npm test
+
+# 5) Build 2 bundle FE (dùng build.ps1 để tự nạp Node v22)
+.\build.ps1                 # -> dist/custom-dynamic-form.js (engine)
+.\build.ps1 -Script build:builder   # -> dist/builder/ (app builder)
+
+# 6) (Tùy chọn) Test nhanh PHP validator
+php -l php/validate_form.php
+php -l php/example_validate.php
+```
+
+> Kiểm tra kết quả bước 5: hai thư mục `dist/custom-dynamic-form.js` và `dist/builder/`
+> phải vừa được sinh/chạm lại đúng thời điểm build.
+
+**Sau đó mở trang demo theo 1 trong 2 cách:**
+
+```powershell
+# Cách A — Dev server Vite (nhanh, tự reload khi sửa code)
+npm run dev                 # engine demo:  http://localhost:5173/examples/index.html
+npm run dev:builder         # builder demo: http://localhost:5173/      (khi port trống)
+
+# Cách B — Copy build ra web server tĩnh (giống production)
+#   - Mở examples/live.html trong Laragon http://localhost/custom-form-builder/examples/live.html
+#   - Builder: http://localhost/custom-form-builder/dist/builder/index.html
+```
+
+### 4.2 Cài dependency
 
 ```bash
 # FE
@@ -124,7 +164,7 @@ composer --working-dir=php install
 Nếu laragon chưa có `composer` trong PATH: chạy trong Laragon terminal (đã có sẵn)
 hoặc trỏ thẳng tới `composer.phar`.
 
-### 4.2 Scripts hay dùng
+### 4.3 Scripts hay dùng
 
 | Lệnh | Mô tả |
 |---|---|
