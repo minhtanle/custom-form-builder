@@ -12,14 +12,11 @@ Công cụ xây dựng **form động theo JSON Schema** gồm 3 phần chính:
 
 | Thành phần | Yêu cầu | Ghi chú |
 |---|---|---|
-| Node.js | **v22 trở lên** | Vite/Rolldown cần `node:util.styleText`. `build.ps1` tự tìm Node v22 trong Laragon |
+| Node.js | **v22 trở lên** | Vite/Rolldown cần `node:util.styleText` |
 | npm | kèm theo Node | `npm install` |
 | PHP | 8.0+ | Chỉ cần khi dùng phần validate backend |
 | Composer | có | `composer --working-dir=php install` |
 | Trình duyệt | Chrome/Edge + | Hỗ trợ Custom Elements + Shadow DOM |
-
-> Lưu ý Laragon: Node mặc định có thể là bản v20, build sẽ lỗi. Luôn build qua `build.ps1`
-> để script self-prepend Node v22 vào PATH.
 
 ---
 
@@ -55,7 +52,6 @@ custom-form-builder/
 │   └── test-schema.mjs           # Unit test cho schema-compile (chạy bằng `npm test`)
 ├── docs/
 │   └── integration-php.md        # Hướng dẫn chi tiết tích hợp PHP
-├── build.ps1                     # Script build (engine | builder), tự tìm Node v22
 ├── vite.config.js                # Cấu hình build 2 chế độ: engine lib / builder app
 └── package.json
 ```
@@ -127,9 +123,9 @@ composer --working-dir=php install
 # 4) Kiểm tra nhanh: chạy unit test (bắt buộc phải PASS trước khi build)
 npm test
 
-# 5) Build 2 bundle FE (dùng build.ps1 để tự nạp Node v22)
-.\build.ps1                 # -> dist/custom-dynamic-form.js (engine)
-.\build.ps1 -Script build:builder   # -> dist/builder/ (app builder)
+# 5) Build 2 bundle FE
+npm run build                 # -> dist/custom-dynamic-form.js (engine)
+npm run build:builder         # -> dist/builder/ (app builder)
 
 # 6) (Tùy chọn) Test nhanh PHP validator
 php -l php/validate_form.php
@@ -168,15 +164,12 @@ hoặc trỏ thẳng tới `composer.phar`.
 
 | Lệnh | Mô tả |
 |---|---|
-| `npm run dev` | Dev server cho engine (Vite mặc định port `5173`) http://localhost:5173/examples/index.html |
+| `npm run dev` | Dev server cho engine (Vite mặc định port `5173`) |
 | `npm run dev:builder` | Dev server cho builder (`vite --mode builder`) |
 | `npm test` | Chạy unit test schema-compile |
-| `.\build.ps1` | Build engine → `dist/custom-dynamic-form.js` |
-| `.\build.ps1 -Script build:builder` | Build builder → `dist/builder/` |
-| `.\build.ps1 --watch` | Build engine chế độ watch (pass-through Vite) |
-
-> `build.ps1 ` tự tìm bản Node v22 trước tiên và prepend vào PATH; nếu chưa có thì báo lỗi
-> kèm hướng dẫn cài trên Laragon (Menu > Node > Version).
+| `npm run build` | Build engine → `dist/custom-dynamic-form.js` |
+| `npm run build:builder` | Build builder → `dist/builder/` |
+| `npm run build -- --watch` | Build engine chế độ watch (pass-through Vite) |
 
 ---
 
@@ -186,10 +179,10 @@ hoặc trỏ thẳng tới `composer.phar`.
 
 ```powershell
 # 1) Build engine
-.\build.ps1
+npm run build
 
 # 2) Build builder
-.\build.ps1 -Script build:builder
+npm run build:builder
 ```
 
 Kết quả: `dist/custom-dynamic-form.js` và `dist/builder/`.
