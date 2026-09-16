@@ -260,6 +260,30 @@ formEl.uiSchema = {
 Gợi ý widget: `text`, `textarea`, `number`, `email`, `url`, `phone`, `date`,
 `select`, `custom-select` (dropdown kiểu mới), `radio`, `checkbox`, `hidden`.
 
+### 5.4 Kết quả trả về khi submit (`onFormSubmit`)
+
+**Khi form hợp lệ — event `onFormSubmit` được phát, `e.detail` là toàn bộ dữ liệu form** (đã áp giá trị `default`, đúng kiểu dữ liệu theo schema):
+
+```js
+formEl.addEventListener('onFormSubmit', (e) => {
+  // e.detail — ví dụ:
+  // {
+  //   "relation": 1,               // number (khớp const), không phải chuỗi
+  //   "ma_nhan_vien": "NV001",
+  //   "dang_ky_nhan_tin": true
+  // }
+  fetch('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(e.detail),
+  });
+});
+```
+
+**Khi form có lỗi — event `onFormSubmit` KHÔNG được phát.** Engine tự hiển thị lỗi ngay cạnh từng field (message đã chuẩn hóa qua i18n, kiểu `"Vui lòng kiểm tra lại trường [Tên]"`) và KHÔNG có event/payload lỗi nào khác; bạn không nên tự render lỗi FE trong listener này.
+
+> Vì thế FE chỉ xử lý nhánh *thành công* trong `onFormSubmit`. Mọi trường hợp lỗi còn thiếu sót phải được chặn lại ở backend — xem phần [6. Triển khai PHP](#6-triển-khai-php) (backend trả `ok: false` + danh sách lỗi `{field, code, message}` khi HTTP 422).
+
 ---
 
 ## 6. Triển khai PHP
