@@ -8,6 +8,18 @@ Công cụ xây dựng **form động theo JSON Schema** gồm 3 phần chính:
 
 ---
 
+## Mục lục
+
+- [1. Yêu cầu môi trường](#1-yêu-cầu-môi-trường)
+- [2. Cấu trúc thư mục](#2-cấu-trúc-thư-mục)
+- [3. Chức năng từng phần](#3-chức-năng-từng-phần)
+- [4. Cấu hình & cài đặt](#4-cấu-hình--cài-đặt)
+- [5. Triển khai FE](#5-triển-khai-fe)
+- [6. Triển khai PHP](#6-triển-khai-php)
+- [7. Lưu ý khi triển khai production](#7-lưu-ý-khi-triển-khai-production)
+
+---
+
 ## 1. Yêu cầu môi trường
 
 | Thành phần | Yêu cầu | Ghi chú |
