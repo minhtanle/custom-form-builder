@@ -16,14 +16,18 @@ const messages = {
         'loading': 'Đang tải cấu hình...',
 
         // --- Lỗi / validate (tên field truyền qua {field}) ---
-        'error-required': 'Vui lòng kiểm tra lại trường [{field}]',
-        'error-invalid': 'Dữ liệu của trường [{field}] không hợp lệ',
+        'error-required': 'Vui lòng kiểm tra lại trường {field}',
+        'error-invalid': 'Dữ liệu của trường {field} không hợp lệ',
+        'error-email': 'Email của trường {field} không hợp lệ',
+        'error-phone': 'Số điện thoại của trường {field} không hợp lệ',
     },
     en: {
         'loading': 'Loading configuration...',
 
-        'error-required': 'Please check field [{field}]',
-        'error-invalid': 'Data of field [{field}] is invalid',
+        'error-required': 'Please check field {field}',
+        'error-invalid': 'Data of field {field} is invalid',
+        'error-email': 'Email of field {field} is invalid',
+        'error-phone': 'Phone number of field {field} is invalid',
     },
 };
 

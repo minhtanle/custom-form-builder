@@ -50,6 +50,7 @@ function Builder() {
             config: { name: '', description: '', idPrefix: '', fields: [] },
             selectedId: null,
             editingChild: null,
+            confirmDel: false,
             tab: 'preview'
         };
 
@@ -79,6 +80,14 @@ function Builder() {
             var found = null;
             walkFields(function (x, p) {
                 if (x.id === f.id) found = p;
+            });
+            return found;
+        }
+
+        function parentOptionOf(f) {
+            var p = parentOf(f), found = null;
+            if (p) (p.options || []).forEach(function (o) {
+                (o.children || []).forEach(function (c) { if (c.id === f.id) found = o; });
             });
             return found;
         }
@@ -257,6 +266,17 @@ function Builder() {
             return row;
         }
 
+        function inlineRow(labelText, inputNode, hint) {
+            var row = settingRow(labelText, inputNode);
+            row.classList.add('inline');
+            if (hint !== undefined && hint !== null) {
+                var lb = row.querySelector('.row-label');
+                lb.appendChild(document.createElement('br'));
+                lb.appendChild(el('span', 'hint', hint));
+            }
+            return row;
+        }
+
         function textInput(val, bind) {
             var i = document.createElement('input');
             i.type = 'text';
@@ -332,33 +352,35 @@ function Builder() {
             descRow.appendChild(descInput);
             wrap.appendChild(descRow);
 
-            var keyRow = el('div', 'setting-row');
-            keyRow.appendChild(el('label', 'row-label', 'Key (định danh, tự sinh từ nhãn)'));
+            var keyRow = el('div', 'setting-row inline');
+            var keyLb = el('label', 'row-label', 'Key');
+            keyLb.appendChild(document.createElement('br'));
+            keyLb.appendChild(el('span', 'hint', 'Giá trị được gửi lên API và lưu trữ'));
+            keyRow.appendChild(keyLb);
             var keyInput = textInput(f.key, 'key');
             keyRow.appendChild(keyInput);
             wrap.appendChild(keyRow);
 
-            var reqRow = el('div', 'setting-row');
-            var cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.checked = !!f.required;
-            cb.setAttribute('data-bind', 'required');
-            var lb = el('label', 'row-label');
-            lb.appendChild(cb);
-            lb.appendChild(document.createTextNode(' Bắt buộc nhập'));
-            reqRow.appendChild(lb);
-            wrap.appendChild(reqRow);
+            var reqGroup = el('div', 'btn-group');
+            [['0', 'Không'], ['1', 'Có']].forEach(function (pair) {
+                var rb = el('button', 'btn-opt' + ((!!f.required) === (pair[0] === '1') ? ' active' : ''), pair[1]);
+                rb.type = 'button';
+                rb.setAttribute('data-role', 'req-toggle');
+                rb.setAttribute('data-req', pair[0]);
+                reqGroup.appendChild(rb);
+            });
+            wrap.appendChild(inlineRow('Bắt buộc', reqGroup, 'Hiển thị dấu hoa thị đỏ (*)'));
 
             if (!isChildField(f)) {
                 var gridGroup = el('div', 'btn-group');
-                [[12, 'Đầy dòng (12/12)'], [6, 'Nửa dòng (6/12)']].forEach(function (pair) {
+[[6, '50%'], [12, '100%']].forEach(function (pair) {
                     var gb = el('button', 'btn-opt' + ((f.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
                     gb.type = 'button';
                     gb.setAttribute('data-role', 'grid-toggle');
                     gb.setAttribute('data-grid', String(pair[0]));
                     gridGroup.appendChild(gb);
                 });
-                wrap.appendChild(settingRow('Chiều rộng', gridGroup));
+                wrap.appendChild(inlineRow('Chiều rộng', gridGroup, 'Toàn hàng (100%) hoặc một nửa (50%)'));
             }
             return wrap;
         }
@@ -392,23 +414,28 @@ function Builder() {
         function buildOptionNode(f, opt, i) {
             var item = el('div', 'opt-item');
             var row = el('div', 'opt-row');
-            row.appendChild(arrowBtn('\u2191', 'opt-up', i));
-            row.appendChild(arrowBtn('\u2193', 'opt-down', i));
+            var up = arrowBtn('\u2191', 'opt-up', i);
+            up.title = 'Di chuyển lên';
+            row.appendChild(up);
+            var dn = arrowBtn('\u2193', 'opt-down', i);
+            dn.title = 'Di chuyển xuống';
+            row.appendChild(dn);
+            var lab = textInput(opt.label, 'opt-label');
+            lab.setAttribute('data-opt', String(i));
+            lab.classList.add('opt-label');
+            lab.placeholder = 'Nhãn (label)';
             var val = textInput(opt.value, 'opt-value');
             val.classList.add('opt-value');
             val.setAttribute('data-opt', String(i));
-            val.placeholder = 'value';
-            var lab = textInput(opt.label, 'opt-label');
-            lab.setAttribute('data-opt', String(i));
-            lab.placeholder = 'label';
-            row.appendChild(val);
+            val.placeholder = 'Giá trị (value)';
             row.appendChild(lab);
-            var kidsBtn = el('button', 'sub-btn btn-sm', (opt.children && opt.children.length)
-                ? 'children: ' + opt.children.length + ' (bỏ)'
-                : '+ field con');
+            row.appendChild(val);
+            var hasKids = !!(opt.children && opt.children.length);
+            var kidsBtn = el('button', 'sub-btn btn-sm', hasKids ? 'Field con (' + opt.children.length + ')' : '+ Field con');
             kidsBtn.setAttribute('data-role', 'opt-children-toggle');
             kidsBtn.setAttribute('data-opt', String(i));
             kidsBtn.type = 'button';
+            kidsBtn.title = hasKids ? 'Thu gọn / mở rộng field con của option này' : 'Thêm field con xuất hiện khi chọn option này';
             row.appendChild(kidsBtn);
             var del = el('button', 'ibtn del', '\u2715');
             del.setAttribute('data-role', 'del-opt');
@@ -493,7 +520,7 @@ function Builder() {
             wrap.appendChild(keyRow);
 
             var cgridGroup = el('div', 'btn-group');
-            [[12, 'Đầy dòng (12/12)'], [6, 'Nửa dòng (6/12)']].forEach(function (pair) {
+            [[6, '50%'], [12, '100%']].forEach(function (pair) {
                 var gb = el('button', 'btn-opt' + ((c.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
                 gb.type = 'button';
                 gb.setAttribute('data-role', 'grid-toggle');
@@ -501,7 +528,7 @@ function Builder() {
                 gb.setAttribute('data-child', c.id);
                 cgridGroup.appendChild(gb);
             });
-            wrap.appendChild(settingRow('Chiều rộng', cgridGroup));
+            wrap.appendChild(inlineRow('Chiều rộng', cgridGroup, 'Toàn hàng (100%) hoặc một nửa (50%)'));
 
             if (c.type === 'checkbox') {
                 var s = document.createElement('select');
@@ -529,21 +556,22 @@ function Builder() {
                     ock.setAttribute('data-copt', String(idx));
                     ock.checked = (c.defaultValue !== undefined && c.defaultValue !== null && String(c.defaultValue) === String(o.value));
                     ro.appendChild(ock);
+                    var olb = textInput(o.label, 'copt-label');
+                    olb.setAttribute('data-child', c.id);
+                    olb.setAttribute('data-copt', String(idx));
+                    olb.classList.add('opt-label');
+                    olb.placeholder = 'Nhãn (label)';
                     var ov = textInput(o.value, 'copt-value');
                     ov.setAttribute('data-child', c.id);
                     ov.setAttribute('data-copt', String(idx));
                     ov.classList.add('opt-value');
-                    ov.placeholder = 'value';
-                    var olb = textInput(o.label, 'copt-label');
-                    olb.setAttribute('data-child', c.id);
-                    olb.setAttribute('data-copt', String(idx));
-                    olb.placeholder = 'label';
+                    ov.placeholder = 'Giá trị (value)';
                     var od = el('button', 'ibtn del', '\u2715');
                     od.setAttribute('data-role', 'del-copt');
                     od.setAttribute('data-child', c.id);
                     od.setAttribute('data-copt', String(idx));
                     od.type = 'button';
-                    ro.appendChild(ov); ro.appendChild(olb); ro.appendChild(od);
+                    ro.appendChild(olb); ro.appendChild(ov); ro.appendChild(od);
                     orow.appendChild(ro);
                     ol.appendChild(orow);
                 });
@@ -575,17 +603,38 @@ function Builder() {
             if (!$('settings-modal').classList.contains('hidden')) renderSettingsBody();
         }
 
+        function buildSettingsFooter() {
+            var foot = el('div', 'settings-footer');
+            var delBtn = el('button', 'btn btn-sm btn-danger del-field-btn', 'Xóa field');
+            delBtn.type = 'button';
+            delBtn.setAttribute('data-role', 'del-field');
+            foot.appendChild(delBtn);
+            var doneBtn = el('button', 'btn btn-sm btn-primary', 'Xong');
+            doneBtn.type = 'button';
+            doneBtn.setAttribute('data-act', 'close-settings');
+            foot.appendChild(doneBtn);
+            return foot;
+        }
+
         function renderSettingsBody() {
+            state.confirmDel = false;
             settingsEl.innerHTML = '';
             var f = findFieldById(state.selectedId);
             if (!f) {
                 settingsEl.innerHTML = '';
                 return;
             }
+            var titleText = (f.label || '') + ' — ' + (TYPE_NAMES[f.type] || f.type);
+            var titleEl = $('settings-title');
+            titleEl.textContent = titleText.length > 50 ? titleText.slice(0, 50) + '…' : titleText;
+            titleEl.title = titleText;
             var box = el('div');
             var banner = el('div', 'field-type-banner');
             banner.appendChild(el('span', null, TYPE_NAMES[f.type] || f.type));
-            if (isChildField(f)) banner.appendChild(el('span', 'badge child', 'field con'));
+            if (isChildField(f)) {
+                var po = parentOptionOf(f);
+                banner.appendChild(el('span', 'badge child', 'field con · "' + ((po && (po.label || po.value)) || '?') + '"'));
+            }
             box.appendChild(banner);
 
             if (f.type === 'divider' || f.type === 'paragraph') {
@@ -601,13 +650,15 @@ function Builder() {
                     pta.spellcheck = false;
                     pta.placeholder = 'Nhập đoạn văn hiển thị trong form…';
                     pgroup.appendChild(pta);
+                    var pnote = document.createElement('p');
+                    pnote.className = 'html-note';
+                    pnote.innerHTML = 'Hỗ trợ thẻ <code>&lt;a href="https://…"&gt;…&lt;/a&gt;</code> để chèn liên kết. Các thẻ khác (div, b, span, script…) và thuộc tính style/class/on* sẽ bị bỏ khi hiển thị.';
+                    pgroup.appendChild(pnote);
                     box.appendChild(pgroup);
                 } else {
                     box.appendChild(el('p', 'col-hint', 'Kẻ đường phân cách toàn chiều rộng form. Không cần cấu hình thêm.'));
                 }
-                var ldelBtn = bindButton('Xóa', 'del-field');
-                ldelBtn.classList.add('danger');
-                box.appendChild(ldelBtn);
+                box.appendChild(buildSettingsFooter());
                 settingsEl.appendChild(box);
                 return;
             }
@@ -616,10 +667,7 @@ function Builder() {
             if (f.type !== 'select' && f.type !== 'radio') box.appendChild(settingRow('Giá trị mặc định', buildDefaultInput(f)));
             if (f.type === 'select' || f.type === 'radio') box.appendChild(buildOptionsEditor(f));
             box.appendChild(buildValidationSection(f));
-
-            var delBtn = bindButton('Xóa field này', 'del-field');
-            delBtn.classList.add('danger');
-            box.appendChild(delBtn);
+            box.appendChild(buildSettingsFooter());
             settingsEl.appendChild(box);
         }
 
@@ -907,11 +955,29 @@ function Builder() {
             var parentId = t.getAttribute('data-parent');
 
             if (role === 'del-field') {
+                if (!state.confirmDel) {
+                    state.confirmDel = true;
+                    var db = settingsEl.querySelector('.del-field-btn');
+                    if (db) {
+                        db.classList.add('confirm');
+                        db.textContent = 'Xóa? Bấm lại để xác nhận';
+                    }
+                    return;
+                }
                 var idx = -1;
                 state.config.fields.forEach(function (x, i) { if (x.id === f.id) idx = i; });
                 if (idx !== -1) state.config.fields.splice(idx, 1);
                 closeSettings();
                 refreshAll();
+                return;
+            }
+
+            if (role === 'req-toggle') {
+                f.required = t.getAttribute('data-req') === '1';
+                touchCard(f);
+                renderSettings();
+                renderJSON();
+                schedulePreview();
                 return;
             }
 
@@ -1236,7 +1302,7 @@ function Builder() {
             <div className="modal-mask hidden" id="settings-modal">
                 <div className="modal settings-dialog">
                     <div className="settings-header">
-                        <span className="settings-title">Thiết lập field</span>
+                        <span className="settings-title" id="settings-title">Thiết lập field</span>
                         <button type="button" className="ibtn" data-act="close-settings" title="Đóng">{'\u00d7'}</button>
                     </div>
                     <div id="settings-body"></div>

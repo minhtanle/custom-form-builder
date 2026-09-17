@@ -5,6 +5,12 @@ import styles from './styles.css?inline';
 import { t } from './i18n.js';
 import { safeHtml, stripTags } from './sanitize.js';
 
+// Regex chặt hơn format mặc định của validator (@cfworker/json-schema nhận cả "aa@aa")
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+// SĐT Việt Nam: đầu 0 hoặc +84/84, sau khi bỏ khoảng trắng/dấu chấm/gạch/ngoặc
+const PHONE_RE = /^(?:\+?84|0)[1-9]\d{8,9}$/;
+const stripPhone = (s) => String(s).replace(/[\s.\-()]/g, '');
+
 function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
     const [formData, setFormData] = useState({});
     const [visibleFields, setVisibleFields] = useState([]);
@@ -108,6 +114,14 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
     };
 
     const handleFieldChange = (fieldName, value) => {
+        const prop = schema?.properties?.[fieldName];
+        if (prop?.type === 'number') {
+            if (value === '') value = undefined;
+            else {
+                value = Number(value);
+                if (Number.isNaN(value)) value = undefined;
+            }
+        }
         setFormData(prev => ({ ...prev, [fieldName]: value }));
         setErrors({});
         setOpenDropdown(null);
@@ -268,17 +282,35 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         }
 
         // WIDGET DẠNG TEXT INPUT MẶC ĐỊNH (float-label ff-input)
+        const inputType = fieldSchema.type === 'number' ? 'number'
+            : fieldSchema.format === 'phone' || fieldSchema.format === 'tel' ? 'tel'
+            : 'text';
+        const inputMode = fieldSchema.format === 'email' ? 'email'
+            : fieldSchema.format === 'phone' || fieldSchema.format === 'tel' ? 'tel'
+            : fieldSchema.type === 'number' ? 'decimal' : undefined;
+        const isPhoneInput = inputType === 'tel';
         return (
             <div className={`ff field ${cs}${fieldError ? ' has-error' : ''}`}>
                 <div className="relative">
                     <input
-                        type="text"
+                        type={inputType}
+                        inputMode={inputMode}
+                        step={fieldSchema.type === 'number' ? 'any' : undefined}
                         id={fieldId}
                         className={`input ${fieldName} peer ff-input${fieldError ? ' is-invalid' : ''}`}
                         placeholder={title}
-                        value={formData[fieldName] || ''}
-                        onInput={(e) => handleFieldChange(fieldName, e.target.value)}
-                        autoComplete="off"
+                        value={formData[fieldName] ?? ''}
+                        autoComplete={isPhoneInput ? 'tel' : 'off'}
+                        maxLength={isPhoneInput ? 13 : undefined}
+                        onInput={(e) => {
+                            let v = e.target.value;
+                            // SĐT: chặn nhập ký tự chữ, chỉ giữ số / + / khoảng trắng / . - ( ), tối đa 13 ký tự
+                            if (isPhoneInput) {
+                                v = v.replace(/[^0-9+\s.\-()]/g, '').slice(0, 13);
+                                if (v !== e.target.value) e.target.value = v;
+                            }
+                            handleFieldChange(fieldName, v);
+                        }}
                     />
                     <label className="text-label ff-label" htmlFor={fieldId}>{title}{isRequired && <span className="require cdf-text-error"> *</span>}</label>
                 </div>
@@ -299,6 +331,20 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             if (val === undefined || val === null || val === '' || (isBoolean && val === false)) {
                 const fieldTitle = stripTags(schema.properties[f]?.title || f);
                 fieldErrors[f] = t('error-invalid', { field: `[${fieldTitle}]` });
+            }
+        });
+
+        // 3a-2. Format email / phone bằng regex chặt hơn format mặc định của validator
+        Object.keys(schema.properties || {}).forEach(name => {
+            if (name in fieldErrors) return;
+            const prop = schema.properties[name];
+            const val = data[name];
+            if (val === undefined || val === null || val === '') return;
+            const fieldTitle = stripTags(prop.title || name);
+            if (prop.format === 'email' && !EMAIL_RE.test(String(val))) {
+                fieldErrors[name] = t('error-email', { field: `[${fieldTitle}]` });
+            } else if ((prop.format === 'phone' || prop.format === 'tel') && !PHONE_RE.test(stripPhone(val))) {
+                fieldErrors[name] = t('error-phone', { field: `[${fieldTitle}]` });
             }
         });
 

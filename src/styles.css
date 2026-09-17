@@ -39,11 +39,9 @@
 /* --- Composite classes --- */
 .field { position: relative; }
 
-/* Reset box-sizing */
-.ff-input, .my-btn-submit, .my-select-box { box-sizing: border-box; }
+/* box-sizing, font đã áp dụng đồng bộ qua ":host *" ở trên */
 
 .ff-input {
-  box-sizing: border-box;
   height: var(--cdf-field-height);
   width: 100%;
   border-radius: var(--cdf-radius);
@@ -53,8 +51,6 @@
   font-size: 0.875rem;
   line-height: 1;
   color: var(--cdf-text);
-  -webkit-appearance: none;
-  -moz-appearance: none;
   appearance: none;
 }
 .ff-input::placeholder { color: transparent; }
@@ -89,7 +85,6 @@
 }
 
 .check-mark {
-  box-sizing: border-box;
   position: relative;
   top: -1px;
   margin-right: 0.625rem;
@@ -116,23 +111,12 @@
   height: 7px;
   border-right: 2px solid var(--cdf-white);
   border-bottom: 2px solid var(--cdf-white);
-  -webkit-transform: rotate(45deg);
-  -ms-transform: rotate(45deg);
   transform: rotate(45deg);
   opacity: 0;
-  -webkit-transition: all 0.3s ease-in-out;
   transition: all 0.3s ease-in-out;
 }
 .peer:checked ~ .check-mark::after {
   opacity: 1;
-}
-
-.note-input {
-  margin-top: 0.25rem;
-  display: none;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: var(--cdf-error);
 }
 
 .fdrop {
@@ -200,7 +184,6 @@
 .grid { display: grid; }
 .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gap-x-6 { column-gap: 1.5rem; }
-.gap-y-4 { row-gap: 1rem; }
 .gap-y-3 { row-gap: 0.75rem; }
 .items-end { align-items: flex-end; }
 .items-center { align-items: center; }
@@ -237,19 +220,6 @@
 .field.has-error .cdf-text { color: var(--cdf-error); }
 .field.has-error .check-mark { border-color: var(--cdf-error); }
 
-.my-btn-submit {
-  height: var(--cdf-field-height);
-  border: none;
-  border-radius: var(--cdf-radius);
-  background-color: var(--cdf-primary);
-  color: var(--cdf-white);
-  padding: 0 24px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-.my-btn-submit:hover { background-color: var(--cdf-primary-hover); }
-.form-error-summary { font-size: 0.8125rem; }
 .color-secondary { color: var(--cdf-text-secondary); }
 .ff-desc {
   font-size: 0.8rem;
@@ -266,11 +236,7 @@
   margin: 0.5rem 0;
 }
 .ff-paragraph {
-  /* font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--cdf-text); */
   margin: 0 0 0.5rem;
-  /* white-space: pre-wrap; */
 }
 
 /*
