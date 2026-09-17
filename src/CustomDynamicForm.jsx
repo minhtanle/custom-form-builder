@@ -405,11 +405,13 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             {/* DUYỆT UI-SCHEMA LAYOUT: nhưng render thẳng vào lưới grid-cols-2 (mỗi field là 1 ô col-span) */}
             {layoutRows.map((row, rowIndex) => (
                 <Fragment key={rowIndex}>
-                    {row.layoutElement ? (
-                        row.layoutElement.type === 'divider'
-                            ? <hr className="ff-divider col-span-2" />
+{row.layoutElement ? (
+                    row.layoutElement.type === 'divider'
+                        ? <hr className="ff-divider col-span-2" />
+                        : row.layoutElement.type === 'heading'
+                            ? <h3 className="ff-heading col-span-2">{row.layoutElement.text}</h3>
                             : <p className="ff-paragraph col-span-2" dangerouslySetInnerHTML={{ __html: safeHtml(row.layoutElement.text) }} />
-                    ) : (row.fields || []).map(field => {
+                ) : (row.fields || []).map(field => {
                         const fieldName = field.name;
                         // Bỏ qua nếu trường đang bị ẩn do logic conditional
                         if (!visibleFields.includes(fieldName)) return null;

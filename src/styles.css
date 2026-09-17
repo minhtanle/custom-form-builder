@@ -238,6 +238,13 @@
 .ff-paragraph {
   margin: 0 0 0.5rem;
 }
+.ff-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--cdf-text);
+}
 
 /*
  * Link trong nội dung html (đoạn văn / checkbox label):

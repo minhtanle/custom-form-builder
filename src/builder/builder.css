@@ -239,6 +239,11 @@ body {
   color: var(--muted);
   font-style: italic;
 }
+.layout-heading-text {
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--text);
+}
 
 .canvas-options {
     display: flex;

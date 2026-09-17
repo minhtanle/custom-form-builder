@@ -22,12 +22,13 @@ var TYPE_NAMES = {
     checkbox: 'Checkbox',
     hidden: 'Ẩn',
     paragraph: 'Đoạn văn',
-    divider: 'Phân cách'
+    divider: 'Phân cách',
+    heading: 'Tiêu đề'
 };
 var GLYPHS = {
     text: 'Aa', number: '123', email: '\u2709', url: 'URI', phone: 'TEL',
     textarea: '\u00b6', date: '\u25f7', select: '\u25be', radio: '\u25c9', checkbox: '\u2611', hidden: '\u25cc',
-    paragraph: '\u00b6', divider: '\u2500'
+    paragraph: '\u00b6', divider: '\u2500', heading: 'H'
 };
 var CHILD_TYPES = SC.childFieldTypes();
 
@@ -164,13 +165,15 @@ function Builder() {
         }
 
         function buildCardNode(f) {
-            if (f.type === 'divider' || f.type === 'paragraph') {
+            if (f.type === 'divider' || f.type === 'paragraph' || f.type === 'heading') {
                 var lcard = el('div', 'canvas-field layout-field' + (f.id === state.selectedId ? ' selected' : ''));
                 lcard.setAttribute('data-id', f.id);
                 lcard.appendChild(el('div', 'drag-handle', '\u22ee\u22ee'));
                 var lmain = el('div', 'field-main');
                 if (f.type === 'divider') {
                     lmain.appendChild(el('div', 'layout-divider-visual'));
+                } else if (f.type === 'heading') {
+                    lmain.appendChild(el('div', 'field-label layout-heading-text', f.label || '(chưa có tiêu đề)'));
                 } else {
                     lmain.appendChild(el('div', 'field-label layout-paragraph-text', f.label || '(trống)'));
                 }
@@ -637,8 +640,25 @@ function Builder() {
             }
             box.appendChild(banner);
 
-            if (f.type === 'divider' || f.type === 'paragraph') {
-                if (f.type === 'paragraph') {
+            if (f.type === 'divider' || f.type === 'paragraph' || f.type === 'heading') {
+                if (f.type === 'heading') {
+                    var hgroup = el('div', 'setting-group');
+                    hgroup.appendChild(el('label', 'setting-label', 'Nội dung'));
+                    var hta = document.createElement('textarea');
+                    hta.style.width = '100%';
+                    hta.className = 'input';
+                    hta.rows = 10;
+                    hta.value = f.label || '';
+                    hta.setAttribute('data-bind', 'paragraph-text');
+                    hta.spellcheck = false;
+                    hta.placeholder = 'Nhập tiêu đề hiển thị trong form…';
+                    hgroup.appendChild(hta);
+                    var hnote = document.createElement('p');
+                    hnote.className = 'html-note';
+                    hnote.innerHTML = 'Hiển thị dạng tiêu đề (H3). Chỉ văn bản thuần, không hỗ trợ thẻ HTML.';
+                    hgroup.appendChild(hnote);
+                    box.appendChild(hgroup);
+                } else if (f.type === 'paragraph') {
                     var pgroup = el('div', 'setting-group');
                     pgroup.appendChild(el('label', 'setting-label', 'Nội dung'));
                     var pta = document.createElement('textarea');
