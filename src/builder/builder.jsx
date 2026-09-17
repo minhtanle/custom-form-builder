@@ -411,7 +411,7 @@ function Builder() {
 
             if (!isChildField(f)) {
                 var gridGroup = el('div', 'btn-group');
-[[6, '50%'], [12, '100%']].forEach(function (pair) {
+                [[6, '50%'], [12, '100%']].forEach(function (pair) {
                     var gb = el('button', 'btn-opt' + ((f.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
                     gb.type = 'button';
                     gb.setAttribute('data-role', 'grid-toggle');
@@ -1246,39 +1246,169 @@ function Builder() {
                 "type": "object",
                 "properties": {
                     "relation": {
-                        "type": "integer",
                         "title": "Đối tượng liên kết",
-                        "default": 1,
+                        "type": "integer",
                         "oneOf": [
-                            { "const": 1, "title": "Thành viên" },
-                            { "const": 2, "title": "Khách hàng / đối tác" },
-                            { "const": 3, "title": "Khác" }
-                        ]
+                            {
+                                "const": 1,
+                                "title": "Thành viên"
+                            },
+                            {
+                                "const": 2,
+                                "title": "Khách hàng / đối tác"
+                            },
+                            {
+                                "const": 3,
+                                "title": "Khác"
+                            }
+                        ],
+                        "default": 1
                     },
                     "ma_nhan_vien": {
-                        "type": "string",
-                        "title": "Mã nhân viên"
+                        "title": "Mã nhân viên",
+                        "type": "string"
                     },
                     "ten_don_vi_gioi_thieu": {
+                        "title": "Tên đơn vị giới thiệu",
                         "type": "string",
-                        "enum": ["Đơn vị A", "Đơn vị B", "Đơn vị C"],
-                        "title": "Tên đơn vị giới thiệu"
+                        "oneOf": [
+                            {
+                                "const": "Đơn vị A",
+                                "title": "Đơn vị A"
+                            },
+                            {
+                                "const": "Đơn vị B",
+                                "title": "Đơn vị B"
+                            },
+                            {
+                                "const": "Đơn vị C",
+                                "title": "Đơn vị C"
+                            }
+                        ]
+                    },
+                    "checkbox": {
+                        "title": "Tôi xác nhận tôi từ đủ 18 tuổi trở lên.",
+                        "type": "boolean"
+                    },
+                    "checkbox_2": {
+                        "title": "Tôi đã đọc, hiểu và đồng ý với Điều Khoản Sử Dụng, Thông Báo Về Quyền Riêng Tư, <a href=\"https://\">Thông Báo Về Cookies</a>",
+                        "type": "boolean"
                     }
                 },
-                "required": ["relation"],
+                "required": [
+                    "relation",
+                    "checkbox"
+                ],
                 "allOf": [
-                    { "if": { "properties": { "relation": { "const": 1 } } }, "then": { "required": ["ma_nhan_vien"] } },
-                    { "if": { "properties": { "relation": { "const": 2 } } }, "then": { "required": ["ten_don_vi_gioi_thieu"] } }
+                    {
+                        "if": {
+                            "properties": {
+                                "relation": {
+                                    "const": 1
+                                }
+                            }
+                        },
+                        "then": {
+                            "required": [
+                                "ma_nhan_vien"
+                            ]
+                        }
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "relation": {
+                                    "const": 2
+                                }
+                            }
+                        },
+                        "then": {
+                            "required": [
+                                "ten_don_vi_gioi_thieu"
+                            ]
+                        }
+                    }
                 ]
             },
             "uiSchema": {
                 "idPrefix": "demo",
                 "fields": {
-                    "relation": { "ui:widget": "radio" },
-                    "ma_nhan_vien": { "ui:widget": "text" }
+                    "relation": {
+                        "ui:widget": "radio"
+                    },
+                    "ma_nhan_vien": {
+                        "ui:widget": "text"
+                    },
+                    "ten_don_vi_gioi_thieu": {
+                        "ui:widget": "custom-select"
+                    },
+                    "checkbox": {
+                        "ui:widget": "checkbox"
+                    },
+                    "checkbox_2": {
+                        "ui:widget": "checkbox"
+                    }
                 },
                 "layout": [
-                    { "type": "row", "fields": [{ "name": "relation", "grid": 12 }] }
+                    {
+                        "type": "row",
+                        "fields": [],
+                        "layoutElement": {
+                            "type": "heading",
+                            "text": "HEADING"
+                        }
+                    },
+                    {
+                        "type": "row",
+                        "fields": [
+                            {
+                                "name": "relation",
+                                "grid": 12
+                            }
+                        ]
+                    },
+                    {
+                        "type": "row",
+                        "fields": [],
+                        "layoutElement": {
+                            "type": "divider",
+                            "text": "Divider"
+                        }
+                    },
+                    {
+                        "type": "row",
+                        "fields": [],
+                        "layoutElement": {
+                            "type": "heading",
+                            "text": "ĐIỀU KHOẢN"
+                        }
+                    },
+                    {
+                        "type": "row",
+                        "fields": [],
+                        "layoutElement": {
+                            "type": "paragraph",
+                            "text": "Nếu bạn là thành viên, đối tác,...của công ty vui lòng bổ sung thông tin để ghi nhận thành tích cho công ty. Bỏ qua nếu bạn là runner tự do."
+                        }
+                    },
+                    {
+                        "type": "row",
+                        "fields": [
+                            {
+                                "name": "checkbox",
+                                "grid": 12
+                            }
+                        ]
+                    },
+                    {
+                        "type": "row",
+                        "fields": [
+                            {
+                                "name": "checkbox_2",
+                                "grid": 12
+                            }
+                        ]
+                    }
                 ]
             }
         };
