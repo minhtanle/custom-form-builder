@@ -145,9 +145,52 @@ const radioChildOnly = mk('radio', 'loai', 'Loại', {
 const simple = SC.compile({ name: '', fields: [radioChildOnly] });
 assert.ok(simple.uiSchema.layout.every(r => r.fields.every(f => f.name !== 'email_x')), 'radio children skipped in layout');
 
+// Radio child grid: emit ui:grid, round-trip preserves grid
+const radioChildGrid = mk('radio', 'loai2', 'Loại 2', {
+    options: [
+        { value: 'a', label: 'A', children: [mk('text', 'inp_a', 'Input A', { grid: 6 }), mk('select', 'sel_a', 'Select A', { grid: 6 })] }
+    ]
+});
+const gridCfg = SC.compile({ name: '', fields: [radioChildGrid] });
+assert.strictEqual(gridCfg.uiSchema.fields.inp_a['ui:grid'], 6, 'compile emits ui:grid for radio child');
+assert.strictEqual(gridCfg.uiSchema.fields.sel_a['ui:grid'], 6, 'compile emits ui:grid for select child');
+const gridBack = SC.importConfig({ schema: gridCfg.schema, uiSchema: gridCfg.uiSchema });
+var parentField = gridBack.fields.find(f => f.key === 'loai2');
+var childInp = parentField.options[0].children.find(c => c.key === 'inp_a');
+var childSel = parentField.options[0].children.find(c => c.key === 'sel_a');
+assert.strictEqual(childInp.grid, 6, 'import preserves radio child grid 6');
+assert.strictEqual(childSel.grid, 6, 'import preserves select child grid 6');
+const gridRound = SC.compile(gridBack);
+assert.deepStrictEqual(gridRound, gridCfg, 'child grid round-trip is stable');
+
 const empty = SC.compile({ name: '', fields: [] });
 assert.deepStrictEqual(empty.schema.properties, {});
 assert.deepStrictEqual(empty.uiSchema.layout, [{ type: 'row', fields: [] }]);
+
+// --- Layout-only elements: paragraph + divider ---
+const p = mk('paragraph', '__paragraph_1', 'Ghi chú quan trọng');
+const d = mk('divider', '__divider_1', 'Divider');
+const named = mk('text', 'ten', 'Tên người');
+const mixedCfg = { name: 'Mix', fields: [named, p, d] };
+const mixed = SC.compile(mixedCfg);
+
+assert.ok(!('__paragraph_1' in mixed.schema.properties), 'paragraph not in schema.properties');
+assert.ok(!('__divider_1' in mixed.schema.properties), 'divider not in schema.properties');
+assert.ok(mixed.uiSchema.layout.some(r => r.layoutElement && r.layoutElement.type === 'paragraph'), 'layout contains paragraph element');
+assert.ok(mixed.uiSchema.layout.some(r => r.layoutElement && r.layoutElement.type === 'divider'), 'layout contains divider element');
+const pRow = mixed.uiSchema.layout.find(r => r.layoutElement && r.layoutElement.type === 'paragraph');
+assert.strictEqual(pRow.layoutElement.text, 'Ghi chú quan trọng', 'paragraph text preserved');
+assert.deepStrictEqual(pRow.fields, [], 'layout-only row has empty fields');
+assert.ok(mixed.schema.properties.ten, 'data field alongside layouts still compiles');
+
+const mixedBack = SC.importConfig({ schema: mixed.schema, uiSchema: mixed.uiSchema });
+assert.strictEqual(mixedBack.fields.length, 3, 'import restores layout-only fields');
+assert.strictEqual(mixedBack.fields[0].key, 'ten', 'data field order preserved');
+assert.strictEqual(mixedBack.fields[1].type, 'paragraph', 'paragraph restored in order');
+assert.strictEqual(mixedBack.fields[1].label, 'Ghi chú quan trọng', 'paragraph text restored');
+assert.strictEqual(mixedBack.fields[2].type, 'divider', 'divider restored in order');
+const mixedRound = SC.compile(mixedBack);
+assert.deepStrictEqual(mixedRound, mixed, 'layout-only round-trip is stable');
 
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));

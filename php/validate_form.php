@@ -31,6 +31,12 @@ function vraceValidateFormData(array $data, string $schemaPath): array
     }
 
     $validator = new \Opis\JsonSchema\Validator();
+    if (method_exists($validator, 'setMaxErrors')) {
+        $validator->setMaxErrors(50);
+    }
+    if (method_exists($validator, 'setStopAtFirstError')) {
+        $validator->setStopAtFirstError(false);
+    }
     $result = vraceRunValidation($validator, $data, $schema);
 
     if ($result === true) {
@@ -141,7 +147,15 @@ function vraceFlattenError($error, array &$errors, string $contextField = ''): v
     }
 
     $keyword = method_exists($error, 'keyword') ? (string) $error->keyword() : 'invalid';
-    $dataPointer = method_exists($error, 'dataPointer') ? (string) $error->dataPointer() : '';
+    $dataPointer = '';
+    if (method_exists($error, 'dataPointer')) {
+        $dataPointer = (string) $error->dataPointer();
+    } elseif (method_exists($error, 'data')
+        && is_object($error->data())
+        && method_exists($error->data(), 'fullPath')
+    ) {
+        $dataPointer = (string) $error->data()->fullPath();
+    }
     $args = method_exists($error, 'args') ? (array) $error->args() : [];
 
     $field = vraceResolveField($keyword, $dataPointer, $args);
@@ -232,6 +246,8 @@ function vraceBuildMessage(string $keyword, string $field, array $args): string
             return $label . ' has invalid type.';
         case 'enum':
             return $label . ' must be one of the allowed values.';
+        case 'oneOf':
+            return $label . ' must match exactly one of the allowed values.';
         case 'const':
             return $label . ' must match the expected value' . (isset($args['const']) && is_scalar($args['const']) ? ' [' . $args['const'] . ']' : '') . '.';
         case 'format':

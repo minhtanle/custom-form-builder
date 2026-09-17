@@ -20,11 +20,14 @@ var TYPE_NAMES = {
     select: 'Dropdown',
     radio: 'Radio',
     checkbox: 'Checkbox',
-    hidden: 'Ẩn'
+    hidden: 'Ẩn',
+    paragraph: 'Đoạn văn',
+    divider: 'Phân cách'
 };
 var GLYPHS = {
     text: 'Aa', number: '123', email: '\u2709', url: 'URI', phone: 'TEL',
-    textarea: '\u00b6', date: '\u25f7', select: '\u25be', radio: '\u25c9', checkbox: '\u2611', hidden: '\u25cc'
+    textarea: '\u00b6', date: '\u25f7', select: '\u25be', radio: '\u25c9', checkbox: '\u2611', hidden: '\u25cc',
+    paragraph: '\u00b6', divider: '\u2500'
 };
 var CHILD_TYPES = SC.childFieldTypes();
 
@@ -152,6 +155,27 @@ function Builder() {
         }
 
         function buildCardNode(f) {
+            if (f.type === 'divider' || f.type === 'paragraph') {
+                var lcard = el('div', 'canvas-field layout-field' + (f.id === state.selectedId ? ' selected' : ''));
+                lcard.setAttribute('data-id', f.id);
+                lcard.appendChild(el('div', 'drag-handle', '\u22ee\u22ee'));
+                var lmain = el('div', 'field-main');
+                if (f.type === 'divider') {
+                    lmain.appendChild(el('div', 'layout-divider-visual'));
+                } else {
+                    lmain.appendChild(el('div', 'field-label layout-paragraph-text', f.label || '(trống)'));
+                }
+                var lmeta = el('div', 'field-meta');
+                lmeta.appendChild(el('span', 'badge layout-badge', TYPE_NAMES[f.type] || f.type));
+                lmain.appendChild(lmeta);
+                lcard.appendChild(lmain);
+                var ldel = el('button', 'ibtn del', '\u2715');
+                ldel.setAttribute('data-role', 'del-field');
+                ldel.setAttribute('data-id', f.id);
+                ldel.title = 'Xóa';
+                lcard.appendChild(ldel);
+                return lcard;
+            }
             var card = el('div', 'canvas-field' + (f.id === state.selectedId ? ' selected' : ''));
             card.setAttribute('data-id', f.id);
             card.appendChild(el('div', 'drag-handle', '\u22ee\u22ee'));
@@ -468,6 +492,17 @@ function Builder() {
             keyRow.appendChild(keyIn);
             wrap.appendChild(keyRow);
 
+            var cgridGroup = el('div', 'btn-group');
+            [[12, 'Đầy dòng (12/12)'], [6, 'Nửa dòng (6/12)']].forEach(function (pair) {
+                var gb = el('button', 'btn-opt' + ((c.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
+                gb.type = 'button';
+                gb.setAttribute('data-role', 'grid-toggle');
+                gb.setAttribute('data-grid', String(pair[0]));
+                gb.setAttribute('data-child', c.id);
+                cgridGroup.appendChild(gb);
+            });
+            wrap.appendChild(settingRow('Chiều rộng', cgridGroup));
+
             if (c.type === 'checkbox') {
                 var s = document.createElement('select');
                 s.className = 'input';
@@ -552,6 +587,30 @@ function Builder() {
             banner.appendChild(el('span', null, TYPE_NAMES[f.type] || f.type));
             if (isChildField(f)) banner.appendChild(el('span', 'badge child', 'field con'));
             box.appendChild(banner);
+
+            if (f.type === 'divider' || f.type === 'paragraph') {
+                if (f.type === 'paragraph') {
+                    var pgroup = el('div', 'setting-group');
+                    pgroup.appendChild(el('label', 'setting-label', 'Nội dung'));
+                    var pta = document.createElement('textarea');
+                    pta.style.width = '100%';
+                    pta.className = 'input';
+                    pta.rows = 10;
+                    pta.value = f.label || '';
+                    pta.setAttribute('data-bind', 'paragraph-text');
+                    pta.spellcheck = false;
+                    pta.placeholder = 'Nhập đoạn văn hiển thị trong form…';
+                    pgroup.appendChild(pta);
+                    box.appendChild(pgroup);
+                } else {
+                    box.appendChild(el('p', 'col-hint', 'Kẻ đường phân cách toàn chiều rộng form. Không cần cấu hình thêm.'));
+                }
+                var ldelBtn = bindButton('Xóa', 'del-field');
+                ldelBtn.classList.add('danger');
+                box.appendChild(ldelBtn);
+                settingsEl.appendChild(box);
+                return;
+            }
 
             box.appendChild(buildCommonSection(f));
             if (f.type !== 'select' && f.type !== 'radio') box.appendChild(settingRow('Giá trị mặc định', buildDefaultInput(f)));
@@ -750,6 +809,7 @@ function Builder() {
             if (!f) return;
 
             if (bind === 'label') f.label = t.value;
+            else if (bind === 'paragraph-text') f.label = t.value;
             else if (bind === 'description') f.description = t.value;
             else if (bind === 'key') f.key = t.value;
             else if (bind === 'defval') f.defaultValue = normalizeDefault(f, t.value);
@@ -856,7 +916,13 @@ function Builder() {
             }
 
             if (role === 'grid-toggle') {
-                f.grid = Number(t.getAttribute('data-grid'));
+                var childId = t.getAttribute('data-child');
+                if (childId) {
+                    var gc = findChild(childId);
+                    if (gc) gc.grid = Number(t.getAttribute('data-grid'));
+                } else {
+                    f.grid = Number(t.getAttribute('data-grid'));
+                }
                 touchCard(f);
                 renderSettings();
                 renderJSON();
@@ -1009,8 +1075,14 @@ function Builder() {
             export: exportJson,
             copy: copyJson,
             'close-settings': closeSettings,
-            'refresh-preview': function () { refreshPreview(); toast('Đã làm mới preview', 'ok'); }
+            'refresh-preview': function () { refreshPreview(); toast('Đã làm mới preview', 'ok'); },
+            'submit-preview': function () { previewForm.submitForm(); },
+            'clear-preview-json': function () { $('preview-json').textContent = ''; }
         };
+
+        previewForm.addEventListener('onFormSubmit', function (e) {
+            $('preview-json').textContent = JSON.stringify(e.detail, null, 2);
+        });
 
         document.addEventListener('click', function (e) {
             var t = e.target.closest('[data-act]');
@@ -1050,7 +1122,6 @@ function Builder() {
         var DEMO_JSON = {
             "schema": {
                 "type": "object",
-                "description": "Đăng ký tham gia. Chọn option cha để mở field con tương ứng.",
                 "properties": {
                     "relation": {
                         "type": "integer",
@@ -1144,6 +1215,11 @@ function Builder() {
                         </div>
                         <div className="preview-body">
                             <custom-dynamic-form id="preview-form"></custom-dynamic-form>
+                            <div className="preview-submit-bar">
+                                <button type="button" className="btn btn-sm" data-act="submit-preview">Submit</button>
+                                <button type="button" className="btn btn-sm" data-act="clear-preview-json">Xóa JSON</button>
+                            </div>
+                            <pre id="preview-json" className="preview-json" spellcheck="false"></pre>
                         </div>
                     </div>
 

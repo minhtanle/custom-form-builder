@@ -172,9 +172,15 @@
 }
 
 /* --- Radio collapse: children luôn render, ẩn/hiện tức thì qua class .open --- */
-.row_collapse { display: none; }
+.row_collapse:not(.open) { display: none; }
 .row_collapse.open { display: block; }
 .row_collapse.open.grid { display: grid; }
+
+/* --- Radio group: mọi option + children nằm trong 1 .f-rows (cùng cấp) --- */
+.f-rows { display: flex; flex-direction: column; }
+.f-rows > .btn_collapse { margin-top: 0.75rem; }
+.f-rows > .btn_collapse:first-child { margin-top: 0; }
+.f-rows > .row_collapse.open { margin-top: 0.5rem; }
 
 /* --- Error state: tô viền #F0635A + nền #FFE7E5 + label #F0635A --- */
 .ff-input.is-invalid,
@@ -195,6 +201,7 @@
 .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gap-x-6 { column-gap: 1.5rem; }
 .gap-y-4 { row-gap: 1rem; }
+.gap-y-3 { row-gap: 0.75rem; }
 .items-end { align-items: flex-end; }
 .items-center { align-items: center; }
 .items-start { align-items: flex-start; }
@@ -224,7 +231,11 @@
 .cdf-active { background-color: var(--cdf-surface-active); }
 .cdf-text { color: var(--cdf-text); }
 .cdf-text-error { color: var(--cdf-error); }
-.cdf-checkbox-offset { margin-top: 3px; }
+.cdf-checkbox-offset { margin-top: 3px; border-radius: 4px; }
+
+/* Checkbox lỗi (required chưa tích) */
+.field.has-error .cdf-text { color: var(--cdf-error); }
+.field.has-error .check-mark { border-color: var(--cdf-error); }
 
 .my-btn-submit {
   height: var(--cdf-field-height);
@@ -247,3 +258,34 @@
   line-height: 1.35;
 }
 .form-loading { padding: 1.25rem 0; color: var(--cdf-text-secondary); }
+
+/* --- Layout-only elements: divider + paragraph --- */
+.ff-divider {
+  border: none;
+  border-top: 1px solid var(--cdf-border-light);
+  margin: 0.5rem 0;
+}
+.ff-paragraph {
+  /* font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--cdf-text); */
+  margin: 0 0 0.5rem;
+  /* white-space: pre-wrap; */
+}
+
+/*
+ * Link trong nội dung html (đoạn văn / checkbox label):
+ * class của host page không xuyên qua shadow DOM nên style lại ở mức engine.
+ * Nút link mặc định ẩn để giữ form trắng sạch, hover mới hiện màu accent.
+ */
+.ff-paragraph a,
+.cdf-text a {
+  color: var(--cdf-primary);
+  text-decoration: underline;
+}
+.ff-paragraph a:hover,
+.cdf-text a:hover {
+  color: var(--cdf-primary);
+  text-decoration: underline;
+  opacity: 0.85;
+}

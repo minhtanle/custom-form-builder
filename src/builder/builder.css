@@ -225,6 +225,20 @@ body {
 .badge.req { background: var(--danger-soft); color: var(--danger); }
 .badge.grid { background: #e6f7ff; color: #0369a1; }
 .badge.child { background: #fdf3dc; color: #92600a; }
+.badge.layout-badge { background: #f0f0f4; color: #6b7280; }
+
+.canvas-field.layout-field { border-style: dashed; }
+.layout-divider-visual {
+  height: 1px;
+  background: repeating-linear-gradient(to right, var(--border) 0 8px, transparent 8px 14px);
+  margin: 8px 0;
+  width: 100%;
+}
+.layout-paragraph-text {
+  font-weight: 400;
+  color: var(--muted);
+  font-style: italic;
+}
 
 .canvas-options {
     display: flex;
@@ -334,6 +348,9 @@ body {
 }
 .preview-bar #preview-status { margin-left: auto; }
 .preview-body { flex: 1; overflow-y: auto; background: #fff; padding: 4px 0; }
+.preview-submit-bar { padding: 8px 12px; display: flex; gap: 8px; border-bottom: 1px solid var(--border, #e2e5ee); position: sticky; bottom: 0; background: #fff; }
+.preview-json { margin: 0; padding: 12px; background: #f6f7fb; border-top: 1px solid var(--border, #e2e5ee); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.5; color: #1f2430; overflow-x: auto; max-height: 240px; white-space: pre-wrap; word-break: break-word; }
+.preview-json:empty::before { content: "Chưa submit — bấm Submit để xem dữ liệu dạng JSON"; color: #9aa0ad; }
 
 /* ---- Settings modal ---- */
 

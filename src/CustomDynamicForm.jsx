@@ -3,6 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { Validator } from '@cfworker/json-schema';
 import styles from './styles.css?inline';
 import { t } from './i18n.js';
+import { safeHtml, stripTags } from './sanitize.js';
 
 function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
     const [formData, setFormData] = useState({});
@@ -106,13 +107,8 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         return req;
     };
 
-    const handleFieldChange = (fieldName, value, isRadio = false) => {
-        if (isRadio) {
-            // Đổi radio: dọn sạch dữ liệu form để tránh giữ rác của nhánh cũ
-            setFormData({ [fieldName]: value });
-        } else {
-            setFormData(prev => ({ ...prev, [fieldName]: value }));
-        }
+    const handleFieldChange = (fieldName, value) => {
+        setFormData(prev => ({ ...prev, [fieldName]: value }));
         setErrors({});
         setOpenDropdown(null);
     };
@@ -124,6 +120,8 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             const f = row?.fields?.find(x => x && x.name === fieldName);
             if (f && f.grid) grid = f.grid;
         });
+        const ui = uiSchema?.fields?.[fieldName];
+        if (ui && ui['ui:grid']) grid = ui['ui:grid'];
         return grid;
     };
     const colSpan = (fieldName) => Math.max(1, Math.round(fieldGrid(fieldName) / 6));
@@ -143,45 +141,49 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         const cs = `col-span-${colSpan(fieldName)}`;
         const fieldId = prefix(fieldName);
 
-        // WIDGET DẠNG RADIO COLLAPSE (F-ROWS: btn_collapse + row_collapse)
+        // WIDGET DẠNG RADIO COLLAPSE: 1 group duy nhất, mọi option + children cùng cấp
         if (widgetType === 'radio' && fieldSchema.oneOf) {
-            return fieldSchema.oneOf.map(opt => {
-                const isChecked = formData[fieldName] === opt.const;
-                const optionId = `${fieldId}-ck-${opt.const}`;
-                const children = [];
-                if (schema.allOf) {
-                    schema.allOf.forEach(rule => {
-                        if (rule.if && rule.if.properties?.[fieldName]?.const === opt.const && rule.then?.required) {
-                            rule.then.required.forEach(f => children.push(f));
+            return (
+                <div key={fieldName} className={`f-rows ${cs}`}>
+                    {fieldSchema.oneOf.map(opt => {
+                        const isChecked = formData[fieldName] === opt.const;
+                        const optionId = `${fieldId}-ck-${opt.const}`;
+                        const children = [];
+                        if (schema.allOf) {
+                            schema.allOf.forEach(rule => {
+                                if (rule.if && rule.if.properties?.[fieldName]?.const === opt.const && rule.then?.required) {
+                                    rule.then.required.forEach(f => children.push(f));
+                                }
+                            });
                         }
-                    });
-                }
-                // Children luôn được render (không unmount), chỉ ẩn/hiện qua class "open"
-                const open = isChecked && children.length > 0;
+                        // Children luôn được render (không unmount), chỉ ẩn/hiện qua class "open"
+                        const open = isChecked && children.length > 0;
 
-                return (
-                    <div key={opt.const} className="f-rows col-span-2">
-                        <div className="row-input btn_collapse" style={{ marginBottom: isChecked ? '16px' : '0' }}>
-                            <label htmlFor={optionId} className="flex cursor-pointer items-center">
-                                <input
-                                    type="radio"
-                                    name={fieldName}
-                                    id={optionId}
-                                    className="peer sr-only"
-                                    checked={isChecked}
-                                    onChange={() => handleFieldChange(fieldName, opt.const, true)}
-                                />
-                                <span className="check-mark"></span>
-                                <span className="text-base cdf-text">{opt.title}</span>
-                            </label>
-                        </div>
-                        {children.length === 0 && renderDesc(fieldSchema.description)}
-                        <div className={`row-input row_collapse${open ? ' open' : ''}${children.length > 1 ? ' grid grid-cols-2 gap-x-6' : ''}`}>
-                            {children.map(child => renderWidget(child, true))}
-                        </div>
-                    </div>
-                );
-            });
+                        return (
+                            <Fragment key={opt.const}>
+                                <div className="row-input btn_collapse">
+                                    <label htmlFor={optionId} className="flex cursor-pointer items-center">
+                                        <input
+                                            type="radio"
+                                            name={fieldName}
+                                            id={optionId}
+                                            className="peer sr-only"
+                                            checked={isChecked}
+                                            onChange={() => handleFieldChange(fieldName, opt.const)}
+                                        />
+                                        <span className="check-mark"></span>
+                                        <span className="text-base cdf-text">{opt.title}</span>
+                                    </label>
+                                </div>
+                                <div className={`row-input row_collapse${open ? ' open' : ''}${children.length > 1 ? ' grid grid-cols-2 gap-x-6 gap-y-3' : ''}`}>
+                                    {children.map(child => renderWidget(child, true))}
+                                </div>
+                            </Fragment>
+                        );
+                    })}
+                    {renderDesc(fieldSchema.description)}
+                </div>
+            );
         }
 
         // WIDGET DẠNG DROPDOWN CUSTOM (F-SEL: input readonly + chevron + panel fdrop)
@@ -243,11 +245,11 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             );
         }
 
-        // WIDGET DẠNG CHECKBOX (check-mark, kiểu Nestle terms-of-participation)
+        // WIDGET DẠNG CHECKBOX
         if (widgetType === 'checkbox') {
             const isChecked = formData[fieldName] === true;
             return (
-                <div className={cs}>
+                <div className={`ff field ${cs}${fieldError ? ' has-error' : ''}`}>
                     <label htmlFor={fieldId} className={`flex cursor-pointer items-start`}>
                         <input
                             type="checkbox"
@@ -257,7 +259,8 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
                             onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
                         />
                         <span className="check-mark cdf-checkbox-offset"></span>
-                        <span className="text-base cdf-text">{title}</span>
+                        <span className="text-base cdf-text" dangerouslySetInnerHTML={{ __html: safeHtml(title) }} />
+                        {isRequired && <span className="require cdf-text-error"> *</span>}
                     </label>
                     {renderDesc(fieldSchema.description)}
                 </div>
@@ -291,8 +294,10 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         // 3a. Trường bắt buộc còn trống → map đúng tên field (không phụ thuộc message/format của validator)
         getRequiredFields().forEach(f => {
             const val = data[f];
-            if (val === undefined || val === null || val === '') {
-                const fieldTitle = schema.properties[f]?.title || f;
+            // Checkbox required: giá trị false (đã tích rồi bỏ tích) cũng coi như chưa thoả
+            const isBoolean = schema.properties[f]?.type === 'boolean';
+            if (val === undefined || val === null || val === '' || (isBoolean && val === false)) {
+                const fieldTitle = stripTags(schema.properties[f]?.title || f);
                 fieldErrors[f] = t('error-invalid', { field: `[${fieldTitle}]` });
             }
         });
@@ -312,7 +317,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
                     if (knownFields.has(searches[i])) { fieldName = searches[i]; break; }
                 }
                 if (fieldName && !(fieldName in fieldErrors)) {
-                    const fieldTitle = schema.properties[fieldName]?.title || fieldName;
+                    const fieldTitle = stripTags(schema.properties[fieldName]?.title || fieldName);
                     fieldErrors[fieldName] = t('error-required', { field: `[${fieldTitle}]` });
                 }
             });
@@ -322,10 +327,16 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
 
     const handleFormSubmit = (e) => {
         if (e && e.preventDefault) e.preventDefault();
-        const fieldErrors = validateForm(formData);
+        // Chỉ lấy dữ liệu của các field đang hiển thị: bỏ field thuộc nhánh conditional đã ẩn
+        // (vd: đổi radio sang nhánh khác → value cũ của field con không được submit)
+        const payload = {};
+        visibleFields.forEach(name => {
+            if (name in formData) payload[name] = formData[name];
+        });
+        const fieldErrors = validateForm(payload);
         if (Object.keys(fieldErrors).length === 0) {
             setErrors({});
-            onSubmit(formData);
+            onSubmit(payload);
         } else {
             setErrors(fieldErrors);
         }
@@ -342,13 +353,17 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         : [{ type: 'row', fields: Object.keys(schema.properties).map(name => ({ name, grid: 12 })) }];
 
     return (
-        <form onSubmit={handleFormSubmit} className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 items-end rounded-lg cdf-surface p-4">
+        <form onSubmit={handleFormSubmit} className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 items-end rounded-lg cdf-surface p-4">
             {schema.description && <div className="col-span-2 mb-3 color-secondary">{schema.description}</div>}
 
             {/* DUYỆT UI-SCHEMA LAYOUT: nhưng render thẳng vào lưới grid-cols-2 (mỗi field là 1 ô col-span) */}
             {layoutRows.map((row, rowIndex) => (
                 <Fragment key={rowIndex}>
-                    {row.fields.map(field => {
+                    {row.layoutElement ? (
+                        row.layoutElement.type === 'divider'
+                            ? <hr className="ff-divider col-span-2" />
+                            : <p className="ff-paragraph col-span-2" dangerouslySetInnerHTML={{ __html: safeHtml(row.layoutElement.text) }} />
+                    ) : (row.fields || []).map(field => {
                         const fieldName = field.name;
                         // Bỏ qua nếu trường đang bị ẩn do logic conditional
                         if (!visibleFields.includes(fieldName)) return null;
