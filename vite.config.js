@@ -13,10 +13,9 @@ export default defineConfig(({ mode }) => {
         emptyOutDir: true,
         rollupOptions: {
           output: {
-            manualChunks(id) {
-              if (id.includes('node_modules/preact')) return 'preact';
-              if (id.includes('node_modules/sortablejs')) return 'dnd';
-            }
+            entryFileNames: 'builder.js',
+            chunkFileNames: 'builder-[name].js',
+            assetFileNames: 'builder.css'
           }
         }
       }

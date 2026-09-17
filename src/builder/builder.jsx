@@ -307,6 +307,41 @@ function Builder() {
             return b;
         }
 
+        function insertLinkAtCursor(ta) {
+            var start = ta.selectionStart;
+            var end = ta.selectionEnd;
+            var sel = ta.value.slice(start, end) || 'Liên kết';
+            var open = '<a href="https://">';
+            ta.value = ta.value.slice(0, start) + open + sel + '</a>' + ta.value.slice(end);
+            ta.focus();
+            var caret = start + open.length;
+            ta.setSelectionRange(caret, caret + sel.length);
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        function quickLinkButton(ta) {
+            var b = el('button', 'sub-btn', '\u2795 Gắn nhanh thẻ <a>…</a>');
+            b.type = 'button';
+            b.title = 'Chèn link tại con trỏ (bôi đen văn bản để bọc vào thẻ a)';
+            b.addEventListener('click', function () { insertLinkAtCursor(ta); });
+            return b;
+        }
+
+        function labelControl(f) {
+            if (f.type !== 'checkbox') return textInput(f.label, 'label');
+            var ta = document.createElement('textarea');
+            ta.className = 'input';
+            ta.rows = 3;
+            ta.value = f.label || '';
+            ta.setAttribute('data-bind', 'label');
+            ta.spellcheck = false;
+            ta.placeholder = 'Nhập nhãn… Có thể dùng thẻ <a href="https://…">…</a>';
+            var wrap = el('div');
+            wrap.appendChild(ta);
+            wrap.appendChild(quickLinkButton(ta));
+            return wrap;
+        }
+
         function buildValidationSection(f) {
             var wrap = el('div', 'setting-group');
             wrap.appendChild(el('label', 'setting-label', 'Ràng buộc'));
@@ -342,7 +377,7 @@ function Builder() {
         function buildCommonSection(f) {
             var wrap = el('div', 'setting-group');
             wrap.appendChild(el('label', 'setting-label', 'Cơ bản'));
-            wrap.appendChild(settingRow('Nhãn (tên hiển thị)', textInput(f.label, 'label')));
+            wrap.appendChild(settingRow('Nhãn (tên hiển thị)', labelControl(f)));
 
             var descRow = el('div', 'setting-row');
             descRow.appendChild(el('label', 'row-label', 'Mô tả (hiện phía dưới field, có thể để trống)'));
@@ -670,6 +705,7 @@ function Builder() {
                     pta.spellcheck = false;
                     pta.placeholder = 'Nhập đoạn văn hiển thị trong form…';
                     pgroup.appendChild(pta);
+                    pgroup.appendChild(quickLinkButton(pta));
                     var pnote = document.createElement('p');
                     pnote.className = 'html-note';
                     pnote.innerHTML = 'Hỗ trợ thẻ <code>&lt;a href="https://…"&gt;…&lt;/a&gt;</code> để chèn liên kết. Các thẻ khác (div, b, span, script…) và thuộc tính style/class/on* sẽ bị bỏ khi hiển thị.';
