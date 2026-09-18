@@ -46,7 +46,7 @@
 4. `tests/diff-vs-cfworker.mjs` — differential: sinh corpus = `SchemaCompile.compile()` cho mọi kiểu field + hàng trăm data hợp lệ/không hợp lệ; assert `valid` + field-mapping **giống tuyệt đối**. Chạy trong `npm test`.
 5. `package.json`: chuyển `@cfworker/json-schema` `dependencies` → `devDependencies`.
 6. Tách CSS (`?url` + `<link>` trong shadow root; `assetsInlineLimit: 0`; `assetFileNames: 'custom-dynamic-form.css'`) + tighten terser (`passes: 2`, `drop_debugger`, `collapse_vars`, `hoist_props`).
-7. Build engine + builder, so size trước/sau, mở `examples/live.html`.
+7. Build engine + builder, so size trước/sau, mở `dist/index.html`.
 
 ## 6. Hành vi tinh tế của cfworker BẮT BUỘC port đúng
 
@@ -79,4 +79,4 @@
 - [ ] `npm run build` → `dist/custom-dynamic-form.js` + `.css` tồn tại; JS giảm về ~33-35 kB
 - [ ] grep `dist/custom-dynamic-form.js` không còn `Validator`/`@cfworker` code
 - [ ] `npm run build:builder` → preview builder vẫn style đúng
-- [ ] Mở `examples/live.html` qua Laragon → form style đúng, submit OK (email/phone/number/radio con)
+- [ ] Mở `dist/index.html` qua Laragon → form style đúng, submit OK (email/phone/number/radio con)

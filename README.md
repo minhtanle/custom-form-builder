@@ -26,7 +26,7 @@ Công cụ xây dựng **form động theo JSON Schema** gồm 3 phần chính:
 |---|---|---|
 | Node.js | **v22 trở lên** | Vite/Rolldown cần `node:util.styleText` |
 | npm | kèm theo Node | `npm install` |
-| PHP | 8.0+ | Chỉ cần khi dùng phần validate backend |
+| PHP | **7.4 trở lên** | Chỉ cần khi dùng phần validate backend (`opis/json-schema` hỗ trợ từ PHP 7.4) |
 | Composer | có | `composer --working-dir=php install` |
 | Trình duyệt | Chrome/Edge + | Hỗ trợ Custom Elements + Shadow DOM |
 
@@ -40,6 +40,7 @@ custom-form-builder/
 │   ├── CustomDynamicForm.jsx    # ENGINE: định nghĩa <custom-dynamic-form>
 │   ├── styles.css                # CSS của form (được inline thẳng vào bundle)
 │   ├── i18n.js                   # Chuỗi giao diện / lỗi (vi, en)
+│   ├── sanitize.js               # Vệ sinh/chuẩn hóa dữ liệu form (XSS, ép kiểu theo schema)
 │   └── builder/                  # BUILDER app (Preact + SortableJS)
 │       ├── builder.jsx           # Logic builder: palette, canvas, settings, JSON out
 │       ├── builder.css           # Style của builder
@@ -50,20 +51,18 @@ custom-form-builder/
 │   ├── validate_form.php         # Hàm vraceValidateFormData() + collect/làm phẳng lỗi
 │   ├── example_validate.php      # Endpoint mẫu (đọc body JSON, trả 200/422/400)
 │   ├── composer.json             # require opis/json-schema ^2.6
-│   └── vendor/                   # Composer (đã bỏ vào .gitignore)
-├── dist/                         # Kết quả build (không sửa tay)
-│   ├── custom-dynamic-form.js    # Engine bundle (IIFE) — nhúng qua <script src>
-│   └── builder/                  # Builder đã build — chạy tĩnh như trang thường
-├── examples/
-│   ├── index.html                # Nhúng engine + gán schema/uiSchema bằng JS
-│   ├── live.html                 # Nhúng bundle dist + tải schema từ file JSON
-│   └── data/
-│       ├── schema.json           # JSON Schema sinh từ builder (ém dưới dạng oneOf)
-│       └── uiSchema.json         # UI schema (widget, layout, idPrefix)
+│   ├── composer.lock
+│   └── vendor/                   # Composer (bỏ vào .gitignore)
+├── dist/                         # Kết quả build (không sửa tay) — cả 2 file nằm chung 1 thư mục
+│   ├── custom-dynamic-form.js    # Engine bundle (IIFE) — nhúng qua <script src>, chạy độc lập
+│   ├── builder.js                # Builder app (KHÔNG bundle engine vào chung)
+│   ├── builder.css               # Style của builder
+│   └── index.html                # Trang builder: nạp custom-dynamic-form.js + builder.js
 ├── tests/
 │   └── test-schema.mjs           # Unit test cho schema-compile (chạy bằng `npm test`)
 ├── docs/
-│   └── integration-php.md        # Hướng dẫn chi tiết tích hợp PHP
+│   └── development-notes.md      # Ghi chú hướng phát triển / tối ưu build
+├── deploy-gh.sh                  # Build dist/ rồi push lên branch gh-pages
 ├── vite.config.js                # Cấu hình build 2 chế độ: engine lib / builder app
 └── package.json
 ```
@@ -85,7 +84,7 @@ custom-form-builder/
   - `formEl.submitForm()` — gọi validate + emit từ nút ngoài form.
   - Event `onFormSubmit` — emit khi validate thành công, `e.detail` là dữ liệu form.
 
-### 3.2 Builder — `src/builder/` → `dist/builder/`
+### 3.2 Builder — `src/builder/` → `dist/`
 
 - Kéo-thả field từ palette xuống canvas (SortableJS), xóa/di chuyển/kéo thả sắp xếp.
 - Chỉnh sửa thuộc tính field trong panel phải: label, key, required, grid, value mặc định, quy tắc validate.
@@ -137,26 +136,26 @@ npm test
 
 # 5) Build 2 bundle FE
 npm run build                 # -> dist/custom-dynamic-form.js (engine)
-npm run build:builder         # -> dist/builder/ (app builder)
+npm run build:builder         # -> dist/builder.js + dist/index.html (builder)
+#    (hoặc chạy gộp cả 2: npm run build:all)
 
 # 6) (Tùy chọn) Test nhanh PHP validator
 php -l php/validate_form.php
 php -l php/example_validate.php
 ```
 
-> Kiểm tra kết quả bước 5: hai thư mục `dist/custom-dynamic-form.js` và `dist/builder/`
+> Kiểm tra kết quả bước 5: `dist/custom-dynamic-form.js`, `dist/builder.js` và `dist/index.html`
 > phải vừa được sinh/chạm lại đúng thời điểm build.
 
 **Sau đó mở trang demo theo 1 trong 2 cách:**
 
 ```powershell
 # Cách A — Dev server Vite (nhanh, tự reload khi sửa code)
-npm run dev                 # engine demo:  http://localhost:5173/examples/index.html
-npm run dev:builder         # builder demo: http://localhost:5173/      (khi port trống)
+npm run dev:builder         # builder demo: http://localhost:5173/
 
 # Cách B — Copy build ra web server tĩnh (giống production)
-#   - Mở examples/live.html trong Laragon http://localhost/custom-form-builder/examples/live.html
-#   - Builder: http://localhost/custom-form-builder/dist/builder/index.html
+#   - Builder: http://localhost/custom-form-builder/dist/index.html
+#   - Engine: nhúng dist/custom-dynamic-form.js vào trang FE bất kỳ (xem mục 5.2)
 ```
 
 ### 4.2 Cài dependency
@@ -176,11 +175,11 @@ hoặc trỏ thẳng tới `composer.phar`.
 
 | Lệnh | Mô tả |
 |---|---|
-| `npm run dev` | Dev server cho engine (Vite mặc định port `5173`) |
 | `npm run dev:builder` | Dev server cho builder (`vite --mode builder`) |
 | `npm test` | Chạy unit test schema-compile |
 | `npm run build` | Build engine → `dist/custom-dynamic-form.js` |
-| `npm run build:builder` | Build builder → `dist/builder/` |
+| `npm run build:builder` | Build builder → `dist/builder.js`, `dist/builder.css`, `dist/index.html` |
+| `npm run build:all` | Build engine + builder (chạy đúng thứ tự) |
 | `npm run build -- --watch` | Build engine chế độ watch (pass-through Vite) |
 
 ---
@@ -197,7 +196,9 @@ npm run build
 npm run build:builder
 ```
 
-Kết quả: `dist/custom-dynamic-form.js` và `dist/builder/`.
+Kết quả: `dist/custom-dynamic-form.js` và `dist/builder.js` (+ `dist/builder.css`, `dist/index.html`).
+`dist/index.html` nạp engine qua `<script src="./custom-dynamic-form.js">` **độc lập với `builder.js`**.
+Lưu ý: khi build builder riêng lẻ, hãy chạy `npm run build` trước để có sẵn file engine.
 Hai bundle này độc lập — có thể copy thẳng lên web server tĩnh (Apache/Nginx/Laragon public).
 
 ### 5.2 Nhúng engine vào trang
@@ -231,7 +232,7 @@ Hai bundle này độc lập — có thể copy thẳng lên web server tĩnh (A
 
 ### 5.3 Gán schema trực tiếp bằng JS
 
-Không cần fetch — gán object như `examples/index.html`:
+Không cần fetch — gán object trực tiếp:
 
 ```js
 formEl.schema = {
@@ -344,7 +345,6 @@ Quy ước: `code` là keyword JSON Schema (`required`, `type`, `oneOf`, `format
 
 - FE validate để trải nghiệm (phản hồi nhanh).
 - **Backend luôn validate lại** — đây là nguồn sự thật, không tin dữ liệu FE.
-- Xem thêm các case test bắt buộc và lưu ý production trong `docs/integration-php.md`.
 
 ---
 
