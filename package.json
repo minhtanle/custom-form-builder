@@ -9,7 +9,8 @@
     "build": "vite build",
     "build:all": "npm run build && npm run build:builder",
     "dev:builder": "vite --mode builder",
-    "build:builder": "vite build --mode builder"
+    "build:builder": "vite build --mode builder",
+    "preview:builder": "vite preview --mode builder"
   },
   "keywords": [],
   "author": "",

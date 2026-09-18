@@ -19,7 +19,7 @@ try {
     }
 
     $schemaPath = dirname(__DIR__) . '/examples/data/schema.json';
-    $validation = vraceValidateFormData($payload, $schemaPath);
+    $validation = csValidateFormData($payload, $schemaPath);
 
     if ($validation['ok']) {
         echo json_encode([

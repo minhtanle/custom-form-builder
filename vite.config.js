@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => {
         preact(),
         {
           name: 'ensure-engine-in-dist',
+          transformIndexHtml(html, ctx) {
+            // Dev: builder.jsx tự import engine từ source (HMR) — không chèn tag để tránh 404.
+            // Build: dist/index.html phải nạp dist/custom-dynamic-form.js như script độc lập.
+            if (ctx.server) return html;
+            return [
+              {
+                tag: 'script',
+                attrs: { src: 'custom-dynamic-form.js' },
+                injectTo: 'body-prepend'
+              }
+            ];
+          },
           closeBundle() {
             // outDir dùng chung dist/ nên emptyOutDir tắt để không xoá engine đã build;
             // dọn nốt thư mục dist/builder cũ (kế thừa từ cấu hình trước) nếu còn.
@@ -47,7 +59,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [preact()],
     build: {
-      emptyOutDir: false, // keep dist/builder (built separately via build:builder)
+      emptyOutDir: false, // giữ build builder đã có trong dist/
       lib: {
         entry: './src/CustomDynamicForm.jsx',
         name: 'CustomDynamicForm',

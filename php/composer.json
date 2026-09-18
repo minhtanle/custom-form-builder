@@ -1,5 +1,5 @@
 {
-  "name": "vrace/form-validator",
+  "name": "cs/form-validator",
   "description": "PHP validator for custom-form-builder JSON Schema",
   "type": "project",
   "require": {

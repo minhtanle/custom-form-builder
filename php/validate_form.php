@@ -13,9 +13,9 @@ declare(strict_types=1);
  *   ]
  * ]
  */
-function vraceValidateFormData(array $data, string $schemaPath): array
+function csValidateFormData(array $data, string $schemaPath): array
 {
-    $schema = vraceLoadSchema($schemaPath);
+    $schema = csLoadSchema($schemaPath);
 
     if (!class_exists('Opis\\JsonSchema\\Validator')) {
         return [
@@ -37,13 +37,13 @@ function vraceValidateFormData(array $data, string $schemaPath): array
     if (method_exists($validator, 'setStopAtFirstError')) {
         $validator->setStopAtFirstError(false);
     }
-    $result = vraceRunValidation($validator, $data, $schema);
+    $result = csRunValidation($validator, $data, $schema);
 
     if ($result === true) {
         return ['ok' => true, 'errors' => []];
     }
 
-    $errors = vraceCollectErrors($result);
+    $errors = csCollectErrors($result);
 
     return [
         'ok' => count($errors) === 0,
@@ -54,7 +54,7 @@ function vraceValidateFormData(array $data, string $schemaPath): array
 /**
  * @return object
  */
-function vraceLoadSchema(string $schemaPath)
+function csLoadSchema(string $schemaPath)
 {
     if (!is_file($schemaPath)) {
         throw new InvalidArgumentException('Schema file not found: ' . $schemaPath);
@@ -78,7 +78,7 @@ function vraceLoadSchema(string $schemaPath)
  *
  * @return bool|object
  */
-function vraceRunValidation($validator, array $data, object $schema)
+function csRunValidation($validator, array $data, object $schema)
 {
     if (method_exists($validator, 'validate')) {
         $validation = $validator->validate((object) $data, $schema);
@@ -103,7 +103,7 @@ function vraceRunValidation($validator, array $data, object $schema)
  * @param object $validationResult
  * @return array<int, array{field:string,code:string,message:string}>
  */
-function vraceCollectErrors(object $validationResult): array
+function csCollectErrors(object $validationResult): array
 {
     $errors = [];
 
@@ -124,7 +124,7 @@ function vraceCollectErrors(object $validationResult): array
         ]];
     }
 
-    vraceFlattenError($rootError, $errors);
+    csFlattenError($rootError, $errors);
 
     if (count($errors) === 0) {
         $errors[] = [
@@ -140,7 +140,7 @@ function vraceCollectErrors(object $validationResult): array
 /**
  * @param array<int, array{field:string,code:string,message:string}> $errors
  */
-function vraceFlattenError($error, array &$errors, string $contextField = ''): void
+function csFlattenError($error, array &$errors, string $contextField = ''): void
 {
     if (!is_object($error)) {
         return;
@@ -158,7 +158,7 @@ function vraceFlattenError($error, array &$errors, string $contextField = ''): v
     }
     $args = method_exists($error, 'args') ? (array) $error->args() : [];
 
-    $field = vraceResolveField($keyword, $dataPointer, $args);
+    $field = csResolveField($keyword, $dataPointer, $args);
     if ($field === '' && $contextField !== '') {
         $field = $contextField;
     }
@@ -177,7 +177,7 @@ function vraceFlattenError($error, array &$errors, string $contextField = ''): v
             $errors[] = [
                 'field' => $field,
                 'code' => $keyword,
-                'message' => vraceBuildMessage($keyword, $field, $args),
+                'message' => csBuildMessage($keyword, $field, $args),
             ];
         }
     }
@@ -186,7 +186,7 @@ function vraceFlattenError($error, array &$errors, string $contextField = ''): v
         $childContext = $field !== '' ? $field : $contextField;
         foreach ((array) $error->subErrors() as $subError) {
             if (is_object($subError)) {
-                vraceFlattenError($subError, $errors, $childContext);
+                csFlattenError($subError, $errors, $childContext);
             }
         }
     }
@@ -195,7 +195,7 @@ function vraceFlattenError($error, array &$errors, string $contextField = ''): v
 /**
  * @param array<string, mixed> $args
  */
-function vraceResolveField(string $keyword, string $dataPointer, array $args): string
+function csResolveField(string $keyword, string $dataPointer, array $args): string
 {
     if ($keyword === 'required') {
         if (isset($args['missing']) && is_string($args['missing'])) {
@@ -235,7 +235,7 @@ function vraceResolveField(string $keyword, string $dataPointer, array $args): s
 /**
  * @param array<string, mixed> $args
  */
-function vraceBuildMessage(string $keyword, string $field, array $args): string
+function csBuildMessage(string $keyword, string $field, array $args): string
 {
     $label = $field !== '' ? '[' . $field . ']' : 'payload';
 
