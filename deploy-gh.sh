@@ -19,8 +19,7 @@ echo "[1/4] Node: $(node -v)"
 
 # --- 2) Build engine + builder ---
 echo "[2/4] Build..."
-npm run build            # -> dist/custom-dynamic-form.js
-npm run build:builder    # -> dist/builder/
+npm run build:all    # -> dist/builder/
 
 # --- 3) Copy dist/ sang branch gh-pages qua worktree tạm ---
 echo "[3/4] Tạo branch $BRANCH..."
