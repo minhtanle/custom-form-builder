@@ -2,7 +2,8 @@ import { h, render } from 'preact';
 import { useEffect } from 'preact/hooks';
 import Sortable from 'sortablejs';
 import * as SCNS from '../../lib/schema-compile.js';
-import '../CustomDynamicForm.jsx';
+// Dev: nạp engine trực tiếp (prod dùng dist/builder/custom-dynamic-form.js qua <script>).
+if (import.meta.env.DEV) { import('../CustomDynamicForm.jsx'); }
 import './builder.css';
 
 // schema-compile.js is UMD: vite dev serves it without CJS interop (global gets set on
@@ -164,6 +165,30 @@ function Builder() {
 
         function renderJSON() {
             jsonOut.value = JSON.stringify(compiled(), null, 2);
+            renderKeyWarning();
+        }
+
+        function findDuplicateKeys() {
+            return SC.duplicateKeys(state.config);
+        }
+
+        function renderKeyWarning() {
+            var elw = $('key-warning');
+            if (!elw) return;
+            var dups = findDuplicateKeys();
+            if (!dups.length) {
+                elw.classList.add('hidden');
+                elw.textContent = '';
+                return;
+            }
+            elw.textContent = '\u26a0 Trùng key: ' + dups.join(', ') + ' \u2014 các field trùng key sẽ ghi đè nhau trong JSON schema, hãy đổi key khác.';
+            elw.classList.remove('hidden');
+        }
+
+        // Chuỗi cảnh báo trùng key (rỗng nếu không có) để ghép vào toast.
+        function dupKeyHint() {
+            var d = findDuplicateKeys();
+            return d.length ? ' — cảnh báo trùng key: ' + d.join(', ') : '';
         }
 
         var previewTimer = null;
@@ -176,6 +201,7 @@ function Builder() {
             previewForm.schema = c.schema;
             previewForm.uiSchema = c.uiSchema;
             $('preview-status').textContent = 'Cập nhật ' + new Date().toLocaleTimeString() + ' [' + (state.previewLocale || 'vi') + ']';
+            renderKeyWarning();
         }
 
         function setPreviewLocale(loc) {
@@ -1043,8 +1069,13 @@ function Builder() {
             if (bind !== 'key' && bind !== 'child-key') return;
             var f = bind === 'key' ? findFieldById(state.selectedId) : findChild(t.getAttribute('data-child'));
             if (!f) return;
+            var typed = (t.value || '').trim();
+            var used = usedKeys();
+            var isDup = !!typed && typed !== f.key && !!used[typed];
             sanitizeKey(f);
             if (bind === 'key') { var fi = settingsEl.querySelector('input[data-bind="key"]'); if (fi) fi.value = f.key; }
+            if (bind === 'child-key') { t.value = f.key; }
+            if (isDup) toast('Key "' + typed + '" bị trùng — đã tự đổi thành "' + f.key + '"', 'err');
             renderJSON();
             schedulePreview();
         }, true);
@@ -1191,7 +1222,8 @@ function Builder() {
             var map = listForms();
             if (!map[n]) return;
             loadConfig(map[n]);
-            toast('Đã mở form "' + n + '"', 'ok');
+            var lh = dupKeyHint();
+            toast('Đã mở form "' + n + '"' + lh, lh ? 'err' : 'ok');
         });
 
         /* ---- Actions ---- */
@@ -1236,7 +1268,8 @@ function Builder() {
                     if (!cfg.fields.length) throw new Error('không tìm thấy field nào');
                     loadConfig(cfg);
                     $('modal-mask').classList.add('hidden');
-                    toast('Đã nạp import: ' + cfg.fields.length + ' field', 'ok');
+                    var ih = dupKeyHint();
+                    toast('Đã nạp import: ' + cfg.fields.length + ' field' + ih, ih ? 'err' : 'ok');
                 } catch (err) {
                     toast('Lỗi import: ' + err.message, 'err');
                 }
@@ -1486,6 +1519,7 @@ function Builder() {
             <main className="main-area">
                 <section className="col canvas-col">
                     <div className="canvas-head">
+                        <div id="key-warning" className="key-warning hidden"></div>
                         <div className="form-bar">
                             <input id="form-name" className="input form-input" placeholder="Tên form" spellcheck="false" />
                             <input id="form-idprefix" className="input form-input form-input-sm" placeholder="id prefix" spellcheck="false" />

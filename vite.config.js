@@ -1,16 +1,37 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
+import { existsSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export default defineConfig(({ mode }) => {
   if (mode === 'builder') {
-    // Builder app (Preact): src/builder/ -> dist/builder/
+    // Builder app (Preact): src/builder/ -> dist/
+    // Engine được build riêng (npm run build) thành dist/custom-dynamic-form.js, index.html
+    // nhúng nó như script độc lập — KHÔNG bundle vào builder.js.
+    const distDir = resolve(process.cwd(), 'dist');
+    const engineFile = resolve(distDir, 'custom-dynamic-form.js');
     return {
       root: 'src/builder',
       base: './',
-      plugins: [preact()],
+      plugins: [
+        preact(),
+        {
+          name: 'ensure-engine-in-dist',
+          closeBundle() {
+            // outDir dùng chung dist/ nên emptyOutDir tắt để không xoá engine đã build;
+            // dọn nốt thư mục dist/builder cũ (kế thừa từ cấu hình trước) nếu còn.
+            rmSync(resolve(distDir, 'builder'), { recursive: true, force: true });
+            if (!existsSync(engineFile)) {
+              console.warn('[ensure-engine] Thiếu dist/custom-dynamic-form.js — hãy chạy `npm run build` trước rồi build lại builder.');
+              return;
+            }
+            console.log('[ensure-engine] dist/custom-dynamic-form.js sẵn sàng — engine dùng độc lập.');
+          }
+        }
+      ],
       build: {
-        outDir: '../../dist/builder',
-        emptyOutDir: true,
+        outDir: '../../dist',
+        emptyOutDir: false,
         rollupOptions: {
           output: {
             entryFileNames: 'builder.js',

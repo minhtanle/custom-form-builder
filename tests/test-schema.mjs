@@ -251,5 +251,27 @@ assert.strictEqual(mixedBack.fields[2].type, 'divider', 'divider restored in ord
 const mixedRound = SC.compile(mixedBack);
 assert.deepStrictEqual(mixedRound, mixed, 'layout-only round-trip is stable');
 
+// --- Cảnh báo trùng key ---
+assert.deepStrictEqual(SC.duplicateKeys(config), [], 'config sạch: không có key trùng');
+assert.deepStrictEqual(
+    SC.duplicateKeys({ fields: [mk('text', 'a', 'A'), mk('text', 'a', 'A2'), mk('text', 'b', 'B')] }),
+    ['a'], 'phát hiện key trùng cấp cao nhất (1 lần/key)'
+);
+assert.deepStrictEqual(
+    SC.duplicateKeys({ fields: [mk('text', 'a', 'A'), mk('text', 'a', 'A2'), mk('text', 'a', 'A3')] }),
+    ['a'], 'key trùng 3 lần vẫn báo 1 lần'
+);
+assert.deepStrictEqual(
+    SC.duplicateKeys({ fields: [mk('text', 'a', 'A'), mk('radio', 'r', 'R', { options: [{ value: '1', label: 'X', children: [mk('text', 'a', 'A con')] }] })] }),
+    ['a'], 'phát hiện key trùng giữa field cha và field con trong option'
+);
+assert.deepStrictEqual(
+    SC.duplicateKeys({ fields: [mk('radio', 'r', 'R', { options: [
+        { value: '1', label: 'X', children: [mk('text', 'c', 'C1')] },
+        { value: '2', label: 'Y', children: [mk('text', 'c', 'C2')] }
+    ] })] }),
+    ['c'], 'phát hiện key trùng giữa các field con của option khác nhau'
+);
+
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));
