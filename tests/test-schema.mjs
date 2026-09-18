@@ -25,7 +25,6 @@ function mk(type, key, label, extra) {
 
 const config = {
     name: 'Đăng ký tham gia',
-    description: 'Form mẫu cho builder',
     idPrefix: 'dkm',
     fields: [
         mk('radio', 'relation', 'Đối tượng liên kết', {
@@ -45,7 +44,7 @@ const config = {
                 { value: 'cn', label: 'Chi nhánh', children: [] }
             ]
         }),
-        mk('text', 'ho_ten', 'Họ tên', { required: true, grid: 6, validate: { minLength: 2, maxLength: 50 }, description: 'Họ tên đầy đủ như trên giấy tờ.' }),
+        mk('text', 'ho_ten', 'Họ tên', { required: true, grid: 6, validate: { minLength: 2, maxLength: 50 }, description: 'Họ tên đầy đủ như trên giấy tờ.', descriptionEn: 'Full name as on identity document.' }),
         mk('number', 'nam_sinh', 'Năm sinh', { grid: 6, validate: { min: 1900, max: 2026 } }),
         mk('email', 'email', 'Email', { required: true }),
         mk('textarea', 'ghi_chu', 'Ghi chú', {}),
@@ -58,7 +57,7 @@ const config = {
 const { schema, uiSchema } = SC.compile(config);
 
 assert.strictEqual(schema.type, 'object');
-assert.strictEqual(schema.description, 'Form mẫu cho builder');
+assert.strictEqual(schema['$schema'], 'http://json-schema.org/draft-07/schema#', 'compiled schema declares draft-07');
 
 assert.strictEqual(schema.properties.relation.oneOf.length, 3);
 assert.strictEqual(schema.properties.relation.default, 1, 'radio defaults coerced to number when numeric');
@@ -81,7 +80,7 @@ assert.deepStrictEqual(schema.properties.don_vi.oneOf[1].title, { vi: 'Chi nhán
 assert.ok(!('enum' in schema.properties.don_vi), 'select no longer emits enum');
 assert.strictEqual(schema.properties.ho_ten.minLength, 2);
 assert.strictEqual(schema.properties.ho_ten.maxLength, 50);
-assert.strictEqual(schema.properties.ho_ten.description, 'Họ tên đầy đủ như trên giấy tờ.', 'field description compiled');
+assert.deepStrictEqual(schema.properties.ho_ten.description, { vi: 'Họ tên đầy đủ như trên giấy tờ.', en: 'Full name as on identity document.' }, 'field description compiled to {vi,en}');
 assert.strictEqual(schema.properties.nam_sinh.minimum, 1900);
 assert.strictEqual(schema.properties.nam_sinh.maximum, 2026);
 assert.strictEqual(schema.properties.email.format, 'email');
@@ -110,7 +109,7 @@ assert.deepStrictEqual(round2, round1, 'compile -> import -> compile is stable')
 
 // Song ngữ: title field compile thành {vi,en}; import đọc lại label + labelEn
 assert.deepStrictEqual(schema.properties.ho_ten.title, { vi: 'Họ tên', en: 'Họ tên' }, 'field title compiles to {vi,en} (en fallback = vi)');
-assert.deepStrictEqual(schema.properties.ho_ten.description, 'Họ tên đầy đủ như trên giấy tờ.', 'description stays single-language string');
+assert.deepStrictEqual(schema.properties.ho_ten.description, { vi: 'Họ tên đầy đủ như trên giấy tờ.', en: 'Full name as on identity document.' }, 'field description stays {vi,en}');
 assert.deepStrictEqual(schema.properties.relation.oneOf.map(o => o.title), [{ vi: 'Thành viên', en: 'Thành viên' }, { vi: 'Khách hàng', en: 'Khách hàng' }, { vi: 'Khác', en: 'Khác' }], 'radio option titles are {vi,en}');
 
 // Option labelEn round-trips
@@ -139,6 +138,24 @@ const termsBack = SC.importConfig(lc).fields.find(f => f.key === 'terms');
 assert.strictEqual(termsBack.labelEn, 'Terms', 'import restores labelEn');
 assert.deepStrictEqual(SC.compile(SC.importConfig(lc)).schema.properties.terms.title, { vi: 'Điều khoản', en: 'Terms' }, 'labelEn round-trips');
 
+// Song ngữ cho description field: compile {vi,en}, import lại, round-trip
+const lcDesc = SC.compile({ fields: [mk('text', 'gc', 'Ghi chú', { description: 'Viết ngắn gọn.', descriptionEn: 'Keep it short.' })] });
+assert.deepStrictEqual(lcDesc.schema.properties.gc.description, { vi: 'Viết ngắn gọn.', en: 'Keep it short.' }, 'field description compiles to {vi,en}');
+const gcBack = SC.importConfig(lcDesc).fields.find(f => f.key === 'gc');
+assert.strictEqual(gcBack.description, 'Viết ngắn gọn.', 'field description imported');
+assert.strictEqual(gcBack.descriptionEn, 'Keep it short.', 'field descriptionEn imported');
+assert.deepStrictEqual(SC.compile(SC.importConfig(lcDesc)).schema, lcDesc.schema, 'field description round-trips');
+
+// description string cũ (legacy) import được; compile mới phát {vi,en}
+const legacyDesc = SC.importConfig({
+    schema: { type: 'object', properties: { x: { type: 'string', title: 'X', description: 'Mô tả cũ' } } },
+    uiSchema: { layout: [{ type: 'row', fields: [{ name: 'x', grid: 12 }] }] }
+});
+const legacyDescField = legacyDesc.fields.find(f => f.key === 'x');
+assert.strictEqual(legacyDescField.description, 'Mô tả cũ', 'string description imports as-is');
+assert.strictEqual(legacyDescField.descriptionEn, undefined, 'string description has no descriptionEn');
+assert.deepStrictEqual(SC.compile(legacyDesc).schema.properties.x.description, { vi: 'Mô tả cũ', en: 'Mô tả cũ' }, 'legacy string description recompiles to {vi,en}');
+
 // Song ngữ cho paragraph + heading: layoutElement.text thành {vi,en}
 const lp = SC.compile({ fields: [mk('paragraph', '__p1', 'Đoạn A', { labelEn: 'Paragraph A' }), mk('heading', '__h1', 'Tiêu đề', { labelEn: 'Heading' })] });
 const lpTexts = lp.uiSchema.layout.map(r => (r.layoutElement && r.layoutElement.text) || {}).filter(t => Object.keys(t).length);
@@ -151,6 +168,7 @@ assert.strictEqual(cfgBack.idPrefix, 'dkm');
 assert.strictEqual(cfgBack.fields.length, 9);
 const hoTen = cfgBack.fields.find(f => f.key === 'ho_ten');
 assert.strictEqual(hoTen.description, 'Họ tên đầy đủ như trên giấy tờ.', 'field description re-imported');
+assert.strictEqual(hoTen.descriptionEn, 'Full name as on identity document.', 'field descriptionEn re-imported');
 assert.strictEqual(hoTen.labelEn, 'Họ tên', 'import re-adds labelEn (fallback vi)');
 const rel = cfgBack.fields.find(f => f.key === 'relation');
 assert.strictEqual(rel.options[0].label, 'Thành viên');

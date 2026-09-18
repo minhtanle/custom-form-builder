@@ -19,7 +19,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
 
     const idPrefix = uiSchema?.idPrefix || '';
     const prefix = (name) => (idPrefix ? `${idPrefix}-${name}` : name);
-    const renderDesc = (desc) => desc ? <div className="ff-desc">{desc}</div> : null;
+    const renderDesc = (desc) => desc ? <div className="ff-desc">{tr(desc)}</div> : null;
 
     // Ngôn ngữ hiển thị: attribute `lang` của <custom-dynamic-form> (mặc định 'vi').
     // Chuỗi song ngữ lưu trực tiếp trong JSON dạng { vi, en } → chọn theo locale; string giữ nguyên (back-compat).
@@ -408,7 +408,6 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
 
     return (
         <form onSubmit={handleFormSubmit} className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 items-end rounded-lg cdf-surface p-4">
-            {schema.description && <div className="col-span-2 mb-3 color-secondary">{schema.description}</div>}
 
             {/* DUYỆT UI-SCHEMA LAYOUT: nhưng render thẳng vào lưới grid-cols-2 (mỗi field là 1 ô col-span) */}
             {layoutRows.map((row, rowIndex) => (

@@ -48,7 +48,7 @@ function Builder() {
         var canvasCol = document.querySelector('.canvas-col');
 
         var state = {
-            config: { name: '', description: '', idPrefix: '', fields: [] },
+            config: { name: '', idPrefix: '', fields: [] },
             selectedId: null,
             editingChild: null,
             confirmDel: false,
@@ -419,12 +419,12 @@ function Builder() {
             wrap.appendChild(settingRow(state.editLocale === 'en' ? 'Nhãn — EN (tiếng Anh)' : 'Nhãn (tên hiển thị)', labelControl(f)));
 
             var descRow = el('div', 'setting-row');
-            descRow.appendChild(el('label', 'row-label', 'Mô tả (hiện phía dưới field, có thể để trống)'));
+            descRow.appendChild(el('label', 'row-label', state.editLocale === 'en' ? 'Mô tả — EN (hiện phía dưới field)' : 'Mô tả (hiện phía dưới field, có thể để trống)'));
             var descInput = document.createElement('textarea');
             descInput.className = 'input';
             descInput.rows = 2;
-            descInput.value = f.description || '';
-            descInput.setAttribute('data-bind', 'description');
+            descInput.value = state.editLocale === 'en' ? (f.descriptionEn || '') : (f.description || '');
+            descInput.setAttribute('data-bind', state.editLocale === 'en' ? 'description-en' : 'description');
             descInput.spellcheck = false;
             descRow.appendChild(descInput);
             wrap.appendChild(descRow);
@@ -845,7 +845,6 @@ function Builder() {
         function syncTopbar() {
             $('form-name').value = state.config.name || '';
             $('form-idprefix').value = state.config.idPrefix || '';
-            $('form-description').value = state.config.description || '';
         }
 
         function saveForm() {
@@ -961,6 +960,7 @@ function Builder() {
             else if (bind === 'paragraph-text') f.label = t.value;
             else if (bind === 'paragraph-text-en') f.labelEn = t.value;
             else if (bind === 'description') f.description = t.value;
+            else if (bind === 'description-en') f.descriptionEn = t.value;
             else if (bind === 'key') f.key = t.value;
             else if (bind === 'defval') f.defaultValue = normalizeDefault(f, t.value);
             else if (bind === 'min') f.validate.min = t.value === '' ? undefined : Number(t.value);
@@ -1184,7 +1184,6 @@ function Builder() {
 
         $('form-name').addEventListener('input', function (e) { state.config.name = e.target.value; });
         $('form-idprefix').addEventListener('input', function (e) { state.config.idPrefix = e.target.value; schedulePreview(); renderJSON(); });
-        $('form-description').addEventListener('input', function (e) { state.config.description = e.target.value; schedulePreview(); renderJSON(); });
 
         $('load-select').addEventListener('change', function () {
             var n = this.value;
@@ -1212,7 +1211,7 @@ function Builder() {
             },
             new: function () {
                 if (state.config.fields.length && !confirm('Tạo form mới? Dữ liệu hiện tại chưa lưu ở LocalStorage sẽ mất.')) return;
-                loadConfig({ name: '', description: '', idPrefix: '', fields: [] });
+                loadConfig({ name: '', idPrefix: '', fields: [] });
                 toast('Form mới');
             },
             import: function () {
@@ -1500,7 +1499,6 @@ function Builder() {
                             <button type="button" className="btn btn-sm" data-act="copy">Copy</button>
                             <button type="button" className="btn btn-sm btn-danger" data-act="delete" title="Xóa form đã lưu">Xóa</button>
                         </div>
-                        <input id="form-description" className="input form-desc" placeholder="Mô tả form (hiện ở đầu form, có thể để trống)..." spellcheck="false" />
                     </div>
                     <div className="canvas" id="canvas"></div>
                     <div className="canvas-empty-tip" id="canvas-tip">Kéo thả thành phần vào canvas…</div>
