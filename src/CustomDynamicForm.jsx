@@ -11,7 +11,7 @@ const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0
 const PHONE_RE = /^(?:\+?84|0)[1-9]\d{8,9}$/;
 const stripPhone = (s) => String(s).replace(/[\s.\-()]/g, '');
 
-function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
+function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
     const [formData, setFormData] = useState({});
     const [visibleFields, setVisibleFields] = useState([]);
     const [errors, setErrors] = useState({});
@@ -21,11 +21,19 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
     const prefix = (name) => (idPrefix ? `${idPrefix}-${name}` : name);
     const renderDesc = (desc) => desc ? <div className="ff-desc">{desc}</div> : null;
 
+    // Ngôn ngữ hiển thị: attribute `lang` của <custom-dynamic-form> (mặc định 'vi').
+    // Chuỗi song ngữ lưu trực tiếp trong JSON dạng { vi, en } → chọn theo locale; string giữ nguyên (back-compat).
+    const LANG = lang || 'vi';
+    const tr = (v) => {
+        if (v == null) return v;
+        return (typeof v === 'object') ? (v[LANG] || v.vi || Object.values(v)[0] || '') : v;
+    };
+
     // Chuẩn hoá options của dropdown/radio về [ { value, label } ]: ưu tiên oneOf, fallback enum cũ
     const fieldOptions = (fieldSchema) => {
         if (!fieldSchema) return [];
         if (Array.isArray(fieldSchema.oneOf) && fieldSchema.oneOf.length) {
-            return fieldSchema.oneOf.map(o => ({ value: o.const, label: o.title != null && o.title !== '' ? o.title : o.const }));
+            return fieldSchema.oneOf.map(o => ({ value: o.const, label: tr(o.title != null && o.title !== '' ? o.title : o.const) }));
         }
         if (Array.isArray(fieldSchema.enum) && fieldSchema.enum.length) {
             const names = Array.isArray(fieldSchema.enumNames) && fieldSchema.enumNames.length === fieldSchema.enum.length ? fieldSchema.enumNames : null;
@@ -149,7 +157,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
         const fieldUi = uiSchema?.fields?.[fieldName] || {};
         const widgetType = fieldUi['ui:widget'] || 'text';
         const opts = fieldOptions(fieldSchema);
-        const title = fieldSchema.title || fieldName;
+        const title = tr(fieldSchema.title) || fieldName;
         const isRequired = getRequiredFields().has(fieldName);
         const fieldError = errors[fieldName];
         const cs = `col-span-${colSpan(fieldName)}`;
@@ -186,7 +194,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
                                             onChange={() => handleFieldChange(fieldName, opt.const)}
                                         />
                                         <span className="check-mark"></span>
-                                        <span className="text-base cdf-text">{opt.title}</span>
+                                        <span className="text-base cdf-text">{tr(opt.title)}</span>
                                     </label>
                                 </div>
                                 <div className={`row-input row_collapse${open ? ' open' : ''}${children.length > 1 ? ' grid grid-cols-2 gap-x-6 gap-y-3' : ''}`}>
@@ -329,7 +337,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             // Checkbox required: giá trị false (đã tích rồi bỏ tích) cũng coi như chưa thoả
             const isBoolean = schema.properties[f]?.type === 'boolean';
             if (val === undefined || val === null || val === '' || (isBoolean && val === false)) {
-                const fieldTitle = stripTags(schema.properties[f]?.title || f);
+                const fieldTitle = stripTags(tr(schema.properties[f]?.title) || f);
                 fieldErrors[f] = t('error-invalid', { field: `[${fieldTitle}]` });
             }
         });
@@ -340,7 +348,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
             const prop = schema.properties[name];
             const val = data[name];
             if (val === undefined || val === null || val === '') return;
-            const fieldTitle = stripTags(prop.title || name);
+            const fieldTitle = stripTags(tr(prop.title) || name);
             if (prop.format === 'email' && !EMAIL_RE.test(String(val))) {
                 fieldErrors[name] = t('error-email', { field: `[${fieldTitle}]` });
             } else if ((prop.format === 'phone' || prop.format === 'tel') && !PHONE_RE.test(stripPhone(val))) {
@@ -363,7 +371,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
                     if (knownFields.has(searches[i])) { fieldName = searches[i]; break; }
                 }
                 if (fieldName && !(fieldName in fieldErrors)) {
-                    const fieldTitle = stripTags(schema.properties[fieldName]?.title || fieldName);
+                    const fieldTitle = stripTags(tr(schema.properties[fieldName]?.title) || fieldName);
                     fieldErrors[fieldName] = t('error-required', { field: `[${fieldTitle}]` });
                 }
             });
@@ -409,8 +417,8 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef }) {
                     row.layoutElement.type === 'divider'
                         ? <hr className="ff-divider col-span-2" />
                         : row.layoutElement.type === 'heading'
-                            ? <h3 className="ff-heading col-span-2">{row.layoutElement.text}</h3>
-                            : <p className="ff-paragraph col-span-2" dangerouslySetInnerHTML={{ __html: safeHtml(row.layoutElement.text) }} />
+                            ? <h3 className="ff-heading col-span-2">{tr(row.layoutElement.text)}</h3>
+                            : <p className="ff-paragraph col-span-2" dangerouslySetInnerHTML={{ __html: safeHtml(tr(row.layoutElement.text)) }} />
                 ) : (row.fields || []).map(field => {
                         const fieldName = field.name;
                         // Bỏ qua nếu trường đang bị ẩn do logic conditional
@@ -447,6 +455,13 @@ class CustomDynamicForm extends HTMLElement {
         this.shadowRoot.appendChild(this._container);
     }
 
+    // `lang` là attribute chuẩn của HTMLElement (default '') → đổi ngôn ngữ = set el.lang = 'en'
+    static get observedAttributes() { return ['lang']; }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+        if (name === 'lang') this.renderComponent();
+    }
+
     set schema(val) { this._schema = val; this.renderComponent(); }
     set uiSchema(val) { this._uiSchema = val; this.renderComponent(); }
 
@@ -458,7 +473,7 @@ class CustomDynamicForm extends HTMLElement {
     renderComponent() {
         if (this._schema && this._uiSchema) {
             try {
-                render(<DynamicFormCore schema={this._schema} uiSchema={this._uiSchema} apiRef={this._api} onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))} />, this._container);
+                render(<DynamicFormCore schema={this._schema} uiSchema={this._uiSchema} lang={this.lang} apiRef={this._api} onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))} />, this._container);
             } catch (err) {
                 console.error('[custom-dynamic-form] render error:', err);
                 this._container.innerHTML = '<div style="color:red;padding:16px;font-family:monospace">Render error: ' + (err && err.message ? err.message : err) + '</div>';

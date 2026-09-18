@@ -76,8 +76,8 @@ assert.ok(!schema.required.includes('phong_ban'), 'child not in required');
 assert.ok(!schema.required.includes('ma_nhan_vien'), 'radio child not required');
 
 assert.deepStrictEqual(schema.properties.don_vi.oneOf.map(o => o.const), ['trụ sở', 'cn'], 'select options compiled to oneOf consts');
-assert.strictEqual(schema.properties.don_vi.oneOf[0].title, 'Trụ sở', 'select label compiled to oneOf title');
-assert.strictEqual(schema.properties.don_vi.oneOf[1].title, 'Chi nhánh');
+assert.deepStrictEqual(schema.properties.don_vi.oneOf[0].title, { vi: 'Trụ sở', en: 'Trụ sở' }, 'select label compiles to {vi,en}');
+assert.deepStrictEqual(schema.properties.don_vi.oneOf[1].title, { vi: 'Chi nhánh', en: 'Chi nhánh' });
 assert.ok(!('enum' in schema.properties.don_vi), 'select no longer emits enum');
 assert.strictEqual(schema.properties.ho_ten.minLength, 2);
 assert.strictEqual(schema.properties.ho_ten.maxLength, 50);
@@ -108,10 +108,50 @@ const cfgBack = SC.importConfig({ schema, uiSchema });
 const round2 = SC.compile(cfgBack);
 assert.deepStrictEqual(round2, round1, 'compile -> import -> compile is stable');
 
+// Song ngữ: title field compile thành {vi,en}; import đọc lại label + labelEn
+assert.deepStrictEqual(schema.properties.ho_ten.title, { vi: 'Họ tên', en: 'Họ tên' }, 'field title compiles to {vi,en} (en fallback = vi)');
+assert.deepStrictEqual(schema.properties.ho_ten.description, 'Họ tên đầy đủ như trên giấy tờ.', 'description stays single-language string');
+assert.deepStrictEqual(schema.properties.relation.oneOf.map(o => o.title), [{ vi: 'Thành viên', en: 'Thành viên' }, { vi: 'Khách hàng', en: 'Khách hàng' }, { vi: 'Khác', en: 'Khác' }], 'radio option titles are {vi,en}');
+
+// Option labelEn round-trips
+const lcOpt = SC.compile({ fields: [mk('radio', 'loai', 'Loại', { options: [{ value: 'a', label: 'Loại A', labelEn: 'Type A' }] })] });
+assert.deepStrictEqual(lcOpt.schema.properties.loai.oneOf[0].title, { vi: 'Loại A', en: 'Type A' }, 'option labelEn compiled into title.en');
+const optBack = SC.importConfig(lcOpt).fields.find(f => f.key === 'loai');
+assert.strictEqual(optBack.options[0].labelEn, 'Type A', 'import restores option labelEn');
+assert.deepStrictEqual(SC.compile(SC.importConfig(lcOpt)).schema, lcOpt.schema, 'option labelEn round-trips');
+
+// oneOf title string cũ (legacy) import được; compile mới phát {vi,en}
+const legacyOpt = SC.importConfig({
+    schema: { type: 'object', properties: { s: { type: 'string', oneOf: [{ const: 'x', title: 'Legacy' }] } } },
+    uiSchema: {
+        fields: { s: { 'ui:widget': 'custom-select' } },
+        layout: [{ type: 'row', fields: [{ name: 's', grid: 12 }] }]
+    }
+});
+const legacyOptField = legacyOpt.fields.find(f => f.key === 's');
+assert.strictEqual(legacyOptField.options[0].label, 'Legacy', 'string option title imports as label');
+assert.strictEqual(legacyOptField.options[0].labelEn, undefined, 'string option title has no labelEn');
+assert.deepStrictEqual(SC.compile(legacyOpt).schema.properties.s.oneOf[0].title, { vi: 'Legacy', en: 'Legacy' }, 'legacy string option title recompiles to {vi,en}');
+
+const lc = SC.compile({ fields: [mk('text', 'terms', 'Điều khoản', { labelEn: 'Terms' })] });
+assert.deepStrictEqual(lc.schema.properties.terms.title, { vi: 'Điều khoản', en: 'Terms' }, 'labelEn compiled into title.en');
+const termsBack = SC.importConfig(lc).fields.find(f => f.key === 'terms');
+assert.strictEqual(termsBack.labelEn, 'Terms', 'import restores labelEn');
+assert.deepStrictEqual(SC.compile(SC.importConfig(lc)).schema.properties.terms.title, { vi: 'Điều khoản', en: 'Terms' }, 'labelEn round-trips');
+
+// Song ngữ cho paragraph + heading: layoutElement.text thành {vi,en}
+const lp = SC.compile({ fields: [mk('paragraph', '__p1', 'Đoạn A', { labelEn: 'Paragraph A' }), mk('heading', '__h1', 'Tiêu đề', { labelEn: 'Heading' })] });
+const lpTexts = lp.uiSchema.layout.map(r => (r.layoutElement && r.layoutElement.text) || {}).filter(t => Object.keys(t).length);
+assert.deepStrictEqual(lpTexts[0], { vi: 'Đoạn A', en: 'Paragraph A' }, 'paragraph text {vi,en}');
+assert.deepStrictEqual(lpTexts[1], { vi: 'Tiêu đề', en: 'Heading' }, 'heading text {vi,en}');
+assert.deepStrictEqual(SC.compile(SC.importConfig(lp)).schema, lp.schema, 'layout element round-trips');
+assert.deepStrictEqual(SC.compile(SC.importConfig(lp)).uiSchema.layout, lp.uiSchema.layout, 'layout element uiSchema round-trips');
+
 assert.strictEqual(cfgBack.idPrefix, 'dkm');
 assert.strictEqual(cfgBack.fields.length, 9);
 const hoTen = cfgBack.fields.find(f => f.key === 'ho_ten');
 assert.strictEqual(hoTen.description, 'Họ tên đầy đủ như trên giấy tờ.', 'field description re-imported');
+assert.strictEqual(hoTen.labelEn, 'Họ tên', 'import re-adds labelEn (fallback vi)');
 const rel = cfgBack.fields.find(f => f.key === 'relation');
 assert.strictEqual(rel.options[0].label, 'Thành viên');
 assert.strictEqual(rel.options[0].children.length, 1);
@@ -179,7 +219,8 @@ assert.ok(!('__divider_1' in mixed.schema.properties), 'divider not in schema.pr
 assert.ok(mixed.uiSchema.layout.some(r => r.layoutElement && r.layoutElement.type === 'paragraph'), 'layout contains paragraph element');
 assert.ok(mixed.uiSchema.layout.some(r => r.layoutElement && r.layoutElement.type === 'divider'), 'layout contains divider element');
 const pRow = mixed.uiSchema.layout.find(r => r.layoutElement && r.layoutElement.type === 'paragraph');
-assert.strictEqual(pRow.layoutElement.text, 'Ghi chú quan trọng', 'paragraph text preserved');
+assert.strictEqual(pRow.layoutElement.text.vi, 'Ghi chú quan trọng', 'paragraph text preserved (vi)');
+assert.strictEqual(pRow.layoutElement.text.en, 'Ghi chú quan trọng', 'paragraph text en falls back to vi');
 assert.deepStrictEqual(pRow.fields, [], 'layout-only row has empty fields');
 assert.ok(mixed.schema.properties.ten, 'data field alongside layouts still compiles');
 

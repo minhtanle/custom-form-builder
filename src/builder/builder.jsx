@@ -52,7 +52,9 @@ function Builder() {
             selectedId: null,
             editingChild: null,
             confirmDel: false,
-            tab: 'preview'
+            tab: 'preview',
+            editLocale: 'vi',
+            previewLocale: 'vi'
         };
 
         function el(tag, cls, text) {
@@ -60,6 +62,18 @@ function Builder() {
             if (cls) n.className = cls;
             if (text !== undefined && text !== null) n.textContent = text;
             return n;
+        }
+
+        // Văn bản hiển thị trên canvas theo ngôn ngữ đang nhập (EN fallback về VI).
+        function dispText(f) {
+            return state.editLocale === 'en'
+                ? (f.labelEn != null && f.labelEn !== '' ? f.labelEn : f.label)
+                : f.label;
+        }
+        function dispOptLabel(o) {
+            return state.editLocale === 'en'
+                ? (o.labelEn != null && o.labelEn !== '' ? o.labelEn : o.label)
+                : o.label;
         }
 
         function walkFields(cb) {
@@ -161,7 +175,28 @@ function Builder() {
             var c = compiled();
             previewForm.schema = c.schema;
             previewForm.uiSchema = c.uiSchema;
-            $('preview-status').textContent = 'Cập nhật ' + new Date().toLocaleTimeString();
+            $('preview-status').textContent = 'Cập nhật ' + new Date().toLocaleTimeString() + ' [' + (state.previewLocale || 'vi') + ']';
+        }
+
+        function setPreviewLocale(loc) {
+            state.previewLocale = loc;
+            var pf = $('preview-form');
+            if (pf) pf.lang = loc;
+            document.querySelectorAll('.locale-group .locale-btn').forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-locale') === loc);
+            });
+            refreshPreview();
+        }
+
+        function setEditLocale(loc) {
+            state.editLocale = loc;
+            document.querySelectorAll('.modal-locale-group .locale-btn').forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-act') === 'edit-locale-' + loc);
+            });
+            renderCanvas();
+            renderSettings();
+            renderJSON();
+            schedulePreview();
         }
 
         function buildCardNode(f) {
@@ -173,9 +208,9 @@ function Builder() {
                 if (f.type === 'divider') {
                     lmain.appendChild(el('div', 'layout-divider-visual'));
                 } else if (f.type === 'heading') {
-                    lmain.appendChild(el('div', 'field-label layout-heading-text', f.label || '(chưa có tiêu đề)'));
+                    lmain.appendChild(el('div', 'field-label layout-heading-text', dispText(f) || '(chưa có tiêu đề)'));
                 } else {
-                    lmain.appendChild(el('div', 'field-label layout-paragraph-text', f.label || '(trống)'));
+                    lmain.appendChild(el('div', 'field-label layout-paragraph-text', dispText(f) || '(trống)'));
                 }
                 var lmeta = el('div', 'field-meta');
                 lmeta.appendChild(el('span', 'badge layout-badge', TYPE_NAMES[f.type] || f.type));
@@ -192,7 +227,7 @@ function Builder() {
             card.setAttribute('data-id', f.id);
             card.appendChild(el('div', 'drag-handle', '\u22ee\u22ee'));
             var main = el('div', 'field-main');
-            main.appendChild(el('div', 'field-label', f.label || f.key || '(chưa có nhãn)'));
+            main.appendChild(el('div', 'field-label', dispText(f) || f.key || '(chưa có nhãn)'));
             var meta = el('div', 'field-meta');
             meta.appendChild(el('span', 'badge', TYPE_NAMES[f.type] || f.type));
             meta.appendChild(el('span', 'badge key', f.key || ''));
@@ -208,11 +243,11 @@ function Builder() {
                     if (f.type === 'radio') {
                         var line = el('div', 'opt-line');
                         line.appendChild(el('span', 'opt-line-mark', '\u25c9'));
-                        line.appendChild(el('span', 'opt-line-label', o.label || o.value || '(trống)'));
+                        line.appendChild(el('span', 'opt-line-label', dispOptLabel(o) || o.value || '(trống)'));
                         if (o.children && o.children.length) line.appendChild(el('span', 'badge child', 'children ' + o.children.length));
                         optBox.appendChild(line);
                     } else {
-                        optBox.appendChild(el('span', 'badge opt-badge', o.label || o.value || '(trống)'));
+                        optBox.appendChild(el('span', 'badge opt-badge', dispOptLabel(o) || o.value || '(trống)'));
                     }
                 });
                 main.appendChild(optBox);
@@ -328,14 +363,18 @@ function Builder() {
         }
 
         function labelControl(f) {
-            if (f.type !== 'checkbox') return textInput(f.label, 'label');
+            var isEn = state.editLocale === 'en';
+            var bind = isEn ? 'label-en' : 'label';
+            var val = isEn ? f.labelEn : f.label;
+            var ph = isEn ? 'Nhập nhãn tiếng Anh… Có thể dùng thẻ <a href="https://…">…</a>' : 'Nhập nhãn… Có thể dùng thẻ <a href="https://…">…</a>';
+            if (f.type !== 'checkbox') { var i = textInput(val, bind); i.placeholder = ph; return i; }
             var ta = document.createElement('textarea');
             ta.className = 'input';
             ta.rows = 3;
-            ta.value = f.label || '';
-            ta.setAttribute('data-bind', 'label');
+            ta.value = val || '';
+            ta.setAttribute('data-bind', bind);
             ta.spellcheck = false;
-            ta.placeholder = 'Nhập nhãn… Có thể dùng thẻ <a href="https://…">…</a>';
+            ta.placeholder = ph;
             var wrap = el('div');
             wrap.appendChild(ta);
             wrap.appendChild(quickLinkButton(ta));
@@ -377,7 +416,7 @@ function Builder() {
         function buildCommonSection(f) {
             var wrap = el('div', 'setting-group');
             wrap.appendChild(el('label', 'setting-label', 'Cơ bản'));
-            wrap.appendChild(settingRow('Nhãn (tên hiển thị)', labelControl(f)));
+            wrap.appendChild(settingRow(state.editLocale === 'en' ? 'Nhãn — EN (tiếng Anh)' : 'Nhãn (tên hiển thị)', labelControl(f)));
 
             var descRow = el('div', 'setting-row');
             descRow.appendChild(el('label', 'row-label', 'Mô tả (hiện phía dưới field, có thể để trống)'));
@@ -458,10 +497,11 @@ function Builder() {
             var dn = arrowBtn('\u2193', 'opt-down', i);
             dn.title = 'Di chuyển xuống';
             row.appendChild(dn);
-            var lab = textInput(opt.label, 'opt-label');
+            var isEn = state.editLocale === 'en';
+            var lab = textInput(isEn ? opt.labelEn : opt.label, isEn ? 'opt-label-en' : 'opt-label');
             lab.setAttribute('data-opt', String(i));
             lab.classList.add('opt-label');
-            lab.placeholder = 'Nhãn (label)';
+            lab.placeholder = isEn ? 'Nhãn EN (label)' : 'Nhãn (label)';
             var val = textInput(opt.value, 'opt-value');
             val.classList.add('opt-value');
             val.setAttribute('data-opt', String(i));
@@ -498,7 +538,7 @@ function Builder() {
             if (opt.children) {
                 var cwrap = el('div', 'opt-children');
                 var ct = el('div', 'opt-children-title');
-                ct.appendChild(el('span', null, 'Field con xuất hiện khi chọn "' + (opt.label || opt.value || '?') + '"'));
+                ct.appendChild(el('span', null, 'Field con xuất hiện khi chọn "' + (dispOptLabel(opt) || opt.value || '?') + '"'));
                 ct.appendChild(el('span', 'hint', '(bắt buộc khi hiển thị)'));
                 cwrap.appendChild(ct);
                 opt.children.forEach(function (c, ci) {
@@ -527,7 +567,8 @@ function Builder() {
                 sel.appendChild(o);
             });
             top.appendChild(sel);
-            var lab = textInput(c.label, 'child-label');
+            var isEn = state.editLocale === 'en';
+            var lab = textInput(isEn ? c.labelEn : c.label, isEn ? 'child-label-en' : 'child-label');
             lab.setAttribute('data-child', c.id);
             top.appendChild(lab);
             var edit = el('button', 'ibtn', '\u270e');
@@ -594,11 +635,12 @@ function Builder() {
                     ock.setAttribute('data-copt', String(idx));
                     ock.checked = (c.defaultValue !== undefined && c.defaultValue !== null && String(c.defaultValue) === String(o.value));
                     ro.appendChild(ock);
-                    var olb = textInput(o.label, 'copt-label');
+                    var isEn = state.editLocale === 'en';
+                    var olb = textInput(isEn ? o.labelEn : o.label, isEn ? 'copt-label-en' : 'copt-label');
                     olb.setAttribute('data-child', c.id);
                     olb.setAttribute('data-copt', String(idx));
                     olb.classList.add('opt-label');
-                    olb.placeholder = 'Nhãn (label)';
+                    olb.placeholder = isEn ? 'Nhãn EN (label)' : 'Nhãn (label)';
                     var ov = textInput(o.value, 'copt-value');
                     ov.setAttribute('data-child', c.id);
                     ov.setAttribute('data-copt', String(idx));
@@ -676,17 +718,18 @@ function Builder() {
             box.appendChild(banner);
 
             if (f.type === 'divider' || f.type === 'paragraph' || f.type === 'heading') {
+                var isEn = state.editLocale === 'en';
                 if (f.type === 'heading') {
                     var hgroup = el('div', 'setting-group');
-                    hgroup.appendChild(el('label', 'setting-label', 'Nội dung'));
+                    hgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
                     var hta = document.createElement('textarea');
                     hta.style.width = '100%';
                     hta.className = 'input';
                     hta.rows = 10;
-                    hta.value = f.label || '';
-                    hta.setAttribute('data-bind', 'paragraph-text');
+                    hta.value = isEn ? (f.labelEn || '') : (f.label || '');
+                    hta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
                     hta.spellcheck = false;
-                    hta.placeholder = 'Nhập tiêu đề hiển thị trong form…';
+                    hta.placeholder = isEn ? 'Nhập nội dung tiếng Anh…' : 'Nhập tiêu đề hiển thị trong form…';
                     hgroup.appendChild(hta);
                     var hnote = document.createElement('p');
                     hnote.className = 'html-note';
@@ -695,15 +738,15 @@ function Builder() {
                     box.appendChild(hgroup);
                 } else if (f.type === 'paragraph') {
                     var pgroup = el('div', 'setting-group');
-                    pgroup.appendChild(el('label', 'setting-label', 'Nội dung'));
+                    pgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
                     var pta = document.createElement('textarea');
                     pta.style.width = '100%';
                     pta.className = 'input';
                     pta.rows = 10;
-                    pta.value = f.label || '';
-                    pta.setAttribute('data-bind', 'paragraph-text');
+                    pta.value = isEn ? (f.labelEn || '') : (f.label || '');
+                    pta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
                     pta.spellcheck = false;
-                    pta.placeholder = 'Nhập đoạn văn hiển thị trong form…';
+                    pta.placeholder = isEn ? 'Nhập nội dung tiếng Anh…' : 'Nhập đoạn văn hiển thị trong form…';
                     pgroup.appendChild(pta);
                     pgroup.appendChild(quickLinkButton(pta));
                     var pnote = document.createElement('p');
@@ -740,6 +783,7 @@ function Builder() {
         function closeSettings() {
             state.selectedId = null;
             state.editingChild = null;
+            setEditLocale('vi');
             $('settings-modal').classList.add('hidden');
             renderCanvas();
         }
@@ -913,7 +957,9 @@ function Builder() {
             if (!f) return;
 
             if (bind === 'label') f.label = t.value;
+            else if (bind === 'label-en') f.labelEn = t.value;
             else if (bind === 'paragraph-text') f.label = t.value;
+            else if (bind === 'paragraph-text-en') f.labelEn = t.value;
             else if (bind === 'description') f.description = t.value;
             else if (bind === 'key') f.key = t.value;
             else if (bind === 'defval') f.defaultValue = normalizeDefault(f, t.value);
@@ -924,18 +970,20 @@ function Builder() {
             else if (bind === 'pattern') f.validate.pattern = t.value || undefined;
             else if (bind === 'opt-value') { var oi = Number(t.getAttribute('data-opt')); if (f.options[oi]) f.options[oi].value = t.value; }
             else if (bind === 'opt-label') { var ob = Number(t.getAttribute('data-opt')); if (f.options[ob]) f.options[ob].label = t.value; }
+            else if (bind === 'opt-label-en') { var oeb = Number(t.getAttribute('data-opt')); if (f.options[oeb]) f.options[oeb].labelEn = t.value; }
             else if (bind === 'child-label') { var cl = findChild(t.getAttribute('data-child')); if (cl) cl.label = t.value; }
+            else if (bind === 'child-label-en') { var cle = findChild(t.getAttribute('data-child')); if (cle) cle.labelEn = t.value; }
             else if (bind === 'child-key') { var ck = findChild(t.getAttribute('data-child')); if (ck) ck.key = t.value; }
             else if (bind === 'child-defval') { var cd = findChild(t.getAttribute('data-child')); if (cd) cd.defaultValue = normalizeDefault(cd, t.value); }
             else if (bind === 'child-min') { var cm = findChild(t.getAttribute('data-child')); if (cm) cm.validate.min = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'child-max') { var cx = findChild(t.getAttribute('data-child')); if (cx) cx.validate.max = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'child-minlen') { var cln = findChild(t.getAttribute('data-child')); if (cln) cln.validate.minLength = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'child-maxlen') { var clx = findChild(t.getAttribute('data-child')); if (clx) clx.validate.maxLength = t.value === '' ? undefined : Number(t.value); }
-            else if (bind === 'copt-value' || bind === 'copt-label') {
+            else if (bind === 'copt-value' || bind === 'copt-label' || bind === 'copt-label-en') {
                 var co = findChild(t.getAttribute('data-child'));
                 if (co && co.options) {
                     var ci = Number(t.getAttribute('data-copt'));
-                    if (co.options[ci]) co.options[ci][bind === 'copt-value' ? 'value' : 'label'] = t.value;
+                    if (co.options[ci]) co.options[ci][bind === 'copt-value' ? 'value' : (bind === 'copt-label' ? 'label' : 'labelEn')] = t.value;
                 }
             }
 
@@ -1199,6 +1247,10 @@ function Builder() {
             'close-settings': closeSettings,
             'refresh-preview': function () { refreshPreview(); toast('Đã làm mới preview', 'ok'); },
             'submit-preview': function () { previewForm.submitForm(); },
+            'set-preview-locale-vi': function () { setPreviewLocale('vi'); },
+            'set-preview-locale-en': function () { setPreviewLocale('en'); },
+            'edit-locale-vi': function () { setEditLocale('vi'); },
+            'edit-locale-en': function () { setEditLocale('en'); },
             'clear-preview-json': function () { $('preview-json').textContent = ''; }
         };
 
@@ -1246,52 +1298,52 @@ function Builder() {
                 "type": "object",
                 "properties": {
                     "relation": {
-                        "title": "Đối tượng liên kết",
+                        "title": { "vi": "Đối tượng liên kết", "en": "Registration relation" },
                         "type": "integer",
                         "oneOf": [
                             {
                                 "const": 1,
-                                "title": "Thành viên"
+                                "title": { "vi": "Thành viên", "en": "Member" }
                             },
                             {
                                 "const": 2,
-                                "title": "Khách hàng / đối tác"
+                                "title": { "vi": "Khách hàng / đối tác", "en": "Customer / partner" }
                             },
                             {
                                 "const": 3,
-                                "title": "Khác"
+                                "title": { "vi": "Khác", "en": "Other" }
                             }
                         ],
                         "default": 1
                     },
                     "ma_nhan_vien": {
-                        "title": "Mã nhân viên",
+                        "title": { "vi": "Mã nhân viên", "en": "Employee ID" },
                         "type": "string"
                     },
                     "ten_don_vi_gioi_thieu": {
-                        "title": "Tên đơn vị giới thiệu",
+                        "title": { "vi": "Tên đơn vị giới thiệu", "en": "Introducing unit name" },
                         "type": "string",
                         "oneOf": [
                             {
                                 "const": "Đơn vị A",
-                                "title": "Đơn vị A"
+                                "title": { "vi": "Đơn vị A", "en": "Unit A" }
                             },
                             {
                                 "const": "Đơn vị B",
-                                "title": "Đơn vị B"
+                                "title": { "vi": "Đơn vị B", "en": "Unit B" }
                             },
                             {
                                 "const": "Đơn vị C",
-                                "title": "Đơn vị C"
+                                "title": { "vi": "Đơn vị C", "en": "Unit C" }
                             }
                         ]
                     },
                     "checkbox": {
-                        "title": "Tôi xác nhận tôi từ đủ 18 tuổi trở lên.",
+                        "title": { "vi": "Tôi xác nhận tôi từ đủ 18 tuổi trở lên.", "en": "I confirm that I am at least 18 years old." },
                         "type": "boolean"
                     },
                     "checkbox_2": {
-                        "title": "Tôi đã đọc, hiểu và đồng ý với Điều Khoản Sử Dụng, Thông Báo Về Quyền Riêng Tư, <a href=\"https://\">Thông Báo Về Cookies</a>",
+                        "title": { "vi": "Tôi đã đọc, hiểu và đồng ý với Điều Khoản Sử Dụng, Thông Báo Về Quyền Riêng Tư, <a href=\"https://\">Thông Báo Về Cookies</a>", "en": "I have read, understood and agree to the Terms of Use, Privacy Notice, <a href=\"https://\">Cookie Notice</a>" },
                         "type": "boolean"
                     }
                 },
@@ -1380,7 +1432,7 @@ function Builder() {
                         "fields": [],
                         "layoutElement": {
                             "type": "heading",
-                            "text": "ĐIỀU KHOẢN"
+                            "text": { "vi": "ĐIỀU KHOẢN", "en": "TERMS" }
                         }
                     },
                     {
@@ -1388,7 +1440,7 @@ function Builder() {
                         "fields": [],
                         "layoutElement": {
                             "type": "paragraph",
-                            "text": "Nếu bạn là thành viên, đối tác,...của công ty vui lòng bổ sung thông tin để ghi nhận thành tích cho công ty. Bỏ qua nếu bạn là runner tự do."
+                            "text": { "vi": "Nếu bạn là thành viên, đối tác,...của công ty vui lòng bổ sung thông tin để ghi nhận thành tích cho công ty. Bỏ qua nếu bạn là runner tự do.", "en": "If you are a member or partner of the company, please provide additional information so we can record your achievement for the company. Skip this if you are an independent runner." }
                         }
                     },
                     {
@@ -1462,6 +1514,10 @@ function Builder() {
 
                     <div className="panel active" id="panel-preview">
                         <div className="preview-bar">
+                            <span className="locale-group" title="Ngôn ngữ hiển thị form (chọn theo locales trong title)">
+                                <button type="button" className="locale-btn active" data-act="set-preview-locale-vi" data-locale="vi">vi</button>
+                                <button type="button" className="locale-btn" data-act="set-preview-locale-en" data-locale="en">en</button>
+                            </span>
                             <span id="preview-status"></span>
                             <button type="button" className="btn btn-sm" data-act="refresh-preview">Làm mới</button>
                         </div>
@@ -1489,7 +1545,13 @@ function Builder() {
                 <div className="modal settings-dialog">
                     <div className="settings-header">
                         <span className="settings-title" id="settings-title">Thiết lập field</span>
-                        <button type="button" className="ibtn" data-act="close-settings" title="Đóng">{'\u00d7'}</button>
+                        <span className="settings-header-right">
+                            <span className="modal-locale-group" title="Ngôn ngữ nhập liệu cho nhãn field và nội dung đoạn văn/tiêu đề">
+                                <button type="button" className="locale-btn active" data-act="edit-locale-vi">vi</button>
+                                <button type="button" className="locale-btn" data-act="edit-locale-en">en</button>
+                            </span>
+                            <button type="button" className="ibtn" data-act="close-settings" title="Đóng">{'\u00d7'}</button>
+                        </span>
                     </div>
                     <div id="settings-body"></div>
                 </div>

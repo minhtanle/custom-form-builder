@@ -548,6 +548,45 @@ body {
     border-color: var(--accent);
 }
 
+.settings-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.modal-locale-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.modal-locale-group .locale-btn {
+    padding: 4px 12px;
+}
+
+.locale-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+.locale-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s;
+}
+.locale-btn:hover { border-color: var(--accent); color: var(--text); }
+.locale-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
 .toast {
     position: fixed;
     bottom: 20px;
