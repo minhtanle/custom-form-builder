@@ -273,5 +273,37 @@ assert.deepStrictEqual(
     ['c'], 'phát hiện key trùng giữa các field con của option khác nhau'
 );
 
+// --- Radio: ẩn/hiện label + bố cục dọc/ngang (tự xuống dòng, không cấu hình cột) ---
+const radioUi = SC.compile({ fields: [mk('radio', 'loai', 'Loại', { options: [{ value: 'a', label: 'A' }] })] });
+assert.ok(!('ui:options' in radioUi.uiSchema.fields.loai), 'radio mặc định không phát ui:options');
+
+const radioUI2 = mk('radio', 'loai', 'Loại', {
+    labelHidden: true,
+    optionsLayout: 'horizontal',
+    options: [{ value: 'a', label: 'A' }]
+});
+const radio2 = SC.compile({ name: '', fields: [radioUI2] });
+assert.deepStrictEqual(radio2.uiSchema.fields.loai['ui:options'], { hideLabel: true, optionsLayout: 'horizontal' }, 'compile phát ui:options (labelHidden + layout ngang)');
+
+const radioBack = SC.importConfig({ schema: radio2.schema, uiSchema: radio2.uiSchema });
+const radioBackField = radioBack.fields.find(f => f.key === 'loai');
+assert.strictEqual(radioBackField.labelHidden, true, 'import khôi phục labelHidden');
+assert.strictEqual(radioBackField.optionsLayout, 'horizontal', 'import khôi phục optionsLayout');
+assert.strictEqual(radioBackField.optionsColumns, undefined, 'không còn khái niệm số cột');
+assert.deepStrictEqual(SC.compile(radioBack).schema, radio2.schema, 'radio ui:options round-trip schema ổn định');
+assert.deepStrictEqual(SC.compile(radioBack).uiSchema, radio2.uiSchema, 'radio ui:options round-trip uiSchema ổn định');
+
+const radioUI3 = mk('radio', 'loai', 'Loại', {
+    labelHidden: false,
+    optionsLayout: 'horizontal',
+    options: [{ value: 'a', label: 'A' }]
+});
+const radio3 = SC.compile({ name: '', fields: [radioUI3] });
+assert.deepStrictEqual(radio3.uiSchema.fields.loai['ui:options'], { optionsLayout: 'horizontal' }, 'chỉ phát layout ngang khi không ẩn label');
+
+const radioBack3 = SC.importConfig({ schema: radio3.schema, uiSchema: radio3.uiSchema }).fields.find(f => f.key === 'loai');
+assert.strictEqual(radioBack3.labelHidden, undefined, 'labelHidden không bị phát khi không ẩn');
+assert.strictEqual(radioBack3.optionsLayout, 'horizontal', 'layout horizontal khôi phục');
+
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));

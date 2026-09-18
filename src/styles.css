@@ -166,6 +166,12 @@
 .f-rows > .btn_collapse:first-child { margin-top: 0; }
 .f-rows > .row_collapse.open { margin-top: 0.5rem; }
 
+/* --- Radio ngang (options tự xuống dòng): flex-wrap theo độ rộng nội dung --- */
+.f-rows.radio-h { flex-direction: row; flex-wrap: wrap; gap: 0.5rem 1.5rem; align-items: flex-start; }
+.f-rows.radio-h > .btn_collapse { margin-top: 0; }
+.f-rows.radio-h > .form-label { flex: 1 0 100%; margin-bottom: 0; }
+.f-rows.radio-h > .row_collapse.open { flex: 1 0 100%; margin-top: 0.25rem; }
+
 /* --- Error state: tô viền #F0635A + nền #FFE7E5 + label #F0635A --- */
 .ff-input.is-invalid,
 .field.has-error .ff-input {

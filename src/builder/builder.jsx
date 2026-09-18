@@ -198,8 +198,15 @@ function Builder() {
         }
         function refreshPreview() {
             var c = compiled();
-            previewForm.schema = c.schema;
-            previewForm.uiSchema = c.uiSchema;
+            var pf = $('preview-form');
+            if (pf) {
+                // Dev: engine nạp async qua import() → custom element có thể chưa upgrade;
+                // bỏ property shadow để setter trên prototype chạy đúng (dựa vào class đã define).
+                delete pf.schema;
+                delete pf.uiSchema;
+                pf.schema = c.schema;
+                pf.uiSchema = c.uiSchema;
+            }
             $('preview-status').textContent = 'Cập nhật ' + new Date().toLocaleTimeString() + ' [' + (state.previewLocale || 'vi') + ']';
             renderKeyWarning();
         }
@@ -420,6 +427,33 @@ function Builder() {
             } else {
                 wrap.appendChild(el('p', 'col-hint', 'Không có ràng buộc cho loại này.'));
             }
+            return wrap;
+        }
+
+function buildRadioSection(f) {
+            var wrap = el('div', 'setting-group');
+            wrap.appendChild(el('label', 'setting-label', 'Hiển thị (Radio)'));
+
+            var labelGroup = el('div', 'btn-group');
+            [['0', 'Hiện'], ['1', 'Ẩn']].forEach(function (pair) {
+                var b = el('button', 'btn-opt' + ((f.labelHidden === true) === (pair[0] === '1') ? ' active' : ''), pair[1]);
+                b.setAttribute('data-role', 'radio-label-toggle');
+                b.setAttribute('data-hidden', pair[0]);
+                b.type = 'button';
+                labelGroup.appendChild(b);
+            });
+            wrap.appendChild(inlineRow('Nhãn field', labelGroup, 'Hiện/Ẩn tiêu đề của nhóm radio'));
+
+            var layoutGroup = el('div', 'btn-group');
+            [['vertical', 'Dọc'], ['horizontal', 'Ngang']].forEach(function (pair) {
+                var b = el('button', 'btn-opt' + ((f.optionsLayout || 'vertical') === pair[0] ? ' active' : ''), pair[1]);
+                b.setAttribute('data-role', 'radio-layout-toggle');
+                b.setAttribute('data-layout', pair[0]);
+                b.type = 'button';
+                layoutGroup.appendChild(b);
+            });
+            wrap.appendChild(inlineRow('Danh sách lựa chọn', layoutGroup, 'Dọc: mỗi option 1 dòng (mặc định) · Ngang: options xếp ngang và tự xuống dòng'));
+
             return wrap;
         }
 
@@ -791,6 +825,7 @@ function Builder() {
             box.appendChild(buildCommonSection(f));
             if (f.type !== 'select' && f.type !== 'radio') box.appendChild(settingRow('Giá trị mặc định', buildDefaultInput(f)));
             if (f.type === 'select' || f.type === 'radio') box.appendChild(buildOptionsEditor(f));
+            if (f.type === 'radio') box.appendChild(buildRadioSection(f));
             box.appendChild(buildValidationSection(f));
             box.appendChild(buildSettingsFooter());
             settingsEl.appendChild(box);
@@ -1124,6 +1159,24 @@ function Builder() {
                 } else {
                     f.grid = Number(t.getAttribute('data-grid'));
                 }
+                touchCard(f);
+                renderSettings();
+                renderJSON();
+                schedulePreview();
+                return;
+            }
+
+            if (role === 'radio-label-toggle') {
+                f.labelHidden = t.getAttribute('data-hidden') === '1';
+                touchCard(f);
+                renderSettings();
+                renderJSON();
+                schedulePreview();
+                return;
+            }
+
+            if (role === 'radio-layout-toggle') {
+                f.optionsLayout = t.getAttribute('data-layout') === 'horizontal' ? 'horizontal' : undefined;
                 touchCard(f);
                 renderSettings();
                 renderJSON();
@@ -1504,6 +1557,11 @@ function Builder() {
         }
 
         /* ---- Init ---- */
+
+        // Chờ engine đăng ký custom-dynamic-form (dev nạp async qua import()) rồi mới đẩy lại preview
+        if (window.customElements && customElements.whenDefined) {
+            customElements.whenDefined('custom-dynamic-form').then(function () { refreshPreview(); });
+        }
 
         renderPalette();
         refreshLoadSelect('');

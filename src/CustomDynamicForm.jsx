@@ -165,8 +165,16 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
 
         // WIDGET DẠNG RADIO COLLAPSE: 1 group duy nhất, mọi option + children cùng cấp
         if (widgetType === 'radio' && fieldSchema.oneOf) {
+            const radioOpts = fieldUi['ui:options'] || {};
+            const showRadioLabel = radioOpts.hideLabel !== true;
+            const radioLayout = radioOpts.optionsLayout === 'horizontal' ? 'horizontal' : 'vertical';
             return (
-                <div key={fieldName} className={`f-rows ${cs}`}>
+                <div key={fieldName} className={`f-rows ${cs}${radioLayout === 'horizontal' ? ' radio-h' : ''}`}>
+                    {showRadioLabel && (
+                        <label className="form-label" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>
+                            {title}{isRequired && <span className="require cdf-text-error"> *</span>}
+                        </label>
+                    )}
                     {fieldSchema.oneOf.map(opt => {
                         const isChecked = formData[fieldName] === opt.const;
                         const optionId = `${fieldId}-ck-${opt.const}`;
