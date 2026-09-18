@@ -368,6 +368,15 @@ function Builder() {
             return i;
         }
 
+        function dateInput(val, bind) {
+            var i = document.createElement('input');
+            i.type = 'date';
+            i.className = 'input';
+            i.value = val == null ? '' : val;
+            i.setAttribute('data-bind', bind);
+            return i;
+        }
+
         function bindButton(label, role) {
             var b = el('button', 'sub-btn', label);
             b.setAttribute('data-role', role);
@@ -420,6 +429,9 @@ function Builder() {
             if (f.type === 'number') {
                 wrap.appendChild(settingRow('Giá trị nhỏ nhất', numInput(f.validate.min, 'min')));
                 wrap.appendChild(settingRow('Giá trị lớn nhất', numInput(f.validate.max, 'max')));
+            } else if (f.type === 'date') {
+                wrap.appendChild(inlineRow('Ngày nhỏ nhất', dateInput(f.validate.min, 'date-min'), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
+                wrap.appendChild(inlineRow('Ngày lớn nhất', dateInput(f.validate.max, 'date-max'), 'Chặn chọn ngày ngoài khoảng khi submit'));
             } else if (f.type === 'text' || f.type === 'textarea') {
                 wrap.appendChild(settingRow('Độ dài tối thiểu', numInput(f.validate.minLength, 'minlen')));
                 wrap.appendChild(settingRow('Độ dài tối đa', numInput(f.validate.maxLength, 'maxlen')));
@@ -457,7 +469,7 @@ function buildRadioSection(f) {
             return wrap;
         }
 
-        function buildDefaultInput(f) {
+function buildDefaultInput(f) {
             if (f.type === 'checkbox') {
                 var s = document.createElement('select');
                 s.className = 'input';
@@ -469,6 +481,11 @@ function buildRadioSection(f) {
                     s.appendChild(o);
                 });
                 return s;
+            }
+            if (f.type === 'date') {
+                var d = dateInput(f.defaultValue, 'defval');
+                d.title = 'Định dạng YYYY-MM-DD';
+                return d;
             }
             return textInput(f.defaultValue, 'defval');
         }
@@ -721,12 +738,16 @@ function buildRadioSection(f) {
                 wrap.appendChild(addc);
                 wrap.appendChild(el('p', 'col-hint', 'Dropdown này không có field con (chỉ cấp 1).'));
             } else {
-                wrap.appendChild(settingRow(('number' === c.type) ? 'Mặc định (số)' : 'Mặc định', textInput(c.defaultValue, 'child-defval')));
+                var defVal = (c.type === 'date') ? dateInput(c.defaultValue, 'child-defval') : textInput(c.defaultValue, 'child-defval');
+                wrap.appendChild(settingRow(('number' === c.type) ? 'Mặc định (số)' : 'Mặc định', defVal));
             }
 
             if (c.type === 'number') {
                 wrap.appendChild(settingRow('Giá trị nhỏ nhất', withChild(numInput(c.validate.min, 'child-min'), c.id)));
                 wrap.appendChild(settingRow('Giá trị lớn nhất', withChild(numInput(c.validate.max, 'child-max'), c.id)));
+            } else if (c.type === 'date') {
+                wrap.appendChild(inlineRow('Ngày nhỏ nhất', withChild(dateInput(c.validate.min, 'child-date-min'), c.id), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
+                wrap.appendChild(inlineRow('Ngày lớn nhất', withChild(dateInput(c.validate.max, 'child-date-max'), c.id), 'Chặn chọn ngày ngoài khoảng khi submit'));
             } else if (c.type === 'text' || c.type === 'textarea') {
                 wrap.appendChild(settingRow('Độ dài tối thiểu', withChild(numInput(c.validate.minLength, 'child-minlen'), c.id)));
                 wrap.appendChild(settingRow('Độ dài tối đa', withChild(numInput(c.validate.maxLength, 'child-maxlen'), c.id)));
@@ -1026,6 +1047,8 @@ function buildRadioSection(f) {
             else if (bind === 'defval') f.defaultValue = normalizeDefault(f, t.value);
             else if (bind === 'min') f.validate.min = t.value === '' ? undefined : Number(t.value);
             else if (bind === 'max') f.validate.max = t.value === '' ? undefined : Number(t.value);
+            else if (bind === 'date-min') f.validate.min = t.value || undefined;
+            else if (bind === 'date-max') f.validate.max = t.value || undefined;
             else if (bind === 'minlen') f.validate.minLength = t.value === '' ? undefined : Number(t.value);
             else if (bind === 'maxlen') f.validate.maxLength = t.value === '' ? undefined : Number(t.value);
             else if (bind === 'pattern') f.validate.pattern = t.value || undefined;
@@ -1038,6 +1061,8 @@ function buildRadioSection(f) {
             else if (bind === 'child-defval') { var cd = findChild(t.getAttribute('data-child')); if (cd) cd.defaultValue = normalizeDefault(cd, t.value); }
             else if (bind === 'child-min') { var cm = findChild(t.getAttribute('data-child')); if (cm) cm.validate.min = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'child-max') { var cx = findChild(t.getAttribute('data-child')); if (cx) cx.validate.max = t.value === '' ? undefined : Number(t.value); }
+            else if (bind === 'child-date-min') { var cdm = findChild(t.getAttribute('data-child')); if (cdm) cdm.validate.min = t.value || undefined; }
+            else if (bind === 'child-date-max') { var cdmax = findChild(t.getAttribute('data-child')); if (cdmax) cdmax.validate.max = t.value || undefined; }
             else if (bind === 'child-minlen') { var cln = findChild(t.getAttribute('data-child')); if (cln) cln.validate.minLength = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'child-maxlen') { var clx = findChild(t.getAttribute('data-child')); if (clx) clx.validate.maxLength = t.value === '' ? undefined : Number(t.value); }
             else if (bind === 'copt-value' || bind === 'copt-label' || bind === 'copt-label-en') {

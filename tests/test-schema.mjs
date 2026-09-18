@@ -305,5 +305,23 @@ const radioBack3 = SC.importConfig({ schema: radio3.schema, uiSchema: radio3.uiS
 assert.strictEqual(radioBack3.labelHidden, undefined, 'labelHidden không bị phát khi không ẩn');
 assert.strictEqual(radioBack3.optionsLayout, 'horizontal', 'layout horizontal khôi phục');
 
+// --- Date: native picker (format:date) + khoảng ngày min/max (formatMinimum/formatMaximum) ---
+const dateCfg = SC.compile({ name: '', fields: [mk('date', 'ngay', 'Ngày', { validate: { min: '2024-01-01', max: '2024-12-31' }, defaultValue: '2024-06-01' })] });
+assert.strictEqual(dateCfg.schema.properties.ngay.format, 'date', 'date compiles format: date');
+assert.strictEqual(dateCfg.schema.properties.ngay.formatMinimum, '2024-01-01', 'date min → formatMinimum');
+assert.strictEqual(dateCfg.schema.properties.ngay.formatMaximum, '2024-12-31', 'date max → formatMaximum');
+assert.strictEqual(dateCfg.schema.properties.ngay.default, '2024-06-01', 'date default preserved');
+
+const dateBack = SC.importConfig(dateCfg).fields.find(f => f.key === 'ngay');
+assert.strictEqual(dateBack.validate.min, '2024-01-01', 'import khôi phục date validate.min');
+assert.strictEqual(dateBack.validate.max, '2024-12-31', 'import khôi phục date validate.max');
+assert.strictEqual(dateBack.defaultValue, '2024-06-01', 'import khôi phục date defaultValue');
+assert.deepStrictEqual(SC.compile(SC.importConfig(dateCfg)), dateCfg, 'date min/max round-trip ổn định');
+
+const datePlain = SC.compile({ name: '', fields: [mk('date', 'ngay2', 'Ngày 2')] });
+assert.ok(!('formatMinimum' in datePlain.schema.properties.ngay2), 'date không cấu hình min → không phát formatMinimum');
+assert.ok(!('formatMaximum' in datePlain.schema.properties.ngay2), 'date không cấu hình max → không phát formatMaximum');
+assert.deepStrictEqual(SC.compile(SC.importConfig(datePlain)), datePlain, 'date plain round-trip ổn định');
+
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));

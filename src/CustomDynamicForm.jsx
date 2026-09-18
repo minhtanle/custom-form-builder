@@ -10,6 +10,7 @@ const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0
 // SĐT Việt Nam: đầu 0 hoặc +84/84, sau khi bỏ khoảng trắng/dấu chấm/gạch/ngoặc
 const PHONE_RE = /^(?:\+?84|0)[1-9]\d{8,9}$/;
 const stripPhone = (s) => String(s).replace(/[\s.\-()]/g, '');
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
     const [formData, setFormData] = useState({});
@@ -298,7 +299,9 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
         }
 
         // WIDGET DẠNG TEXT INPUT MẶC ĐỊNH (float-label ff-input)
+        const isDateInput = fieldSchema.format === 'date';
         const inputType = fieldSchema.type === 'number' ? 'number'
+            : isDateInput ? 'date'
             : fieldSchema.format === 'phone' || fieldSchema.format === 'tel' ? 'tel'
             : 'text';
         const inputMode = fieldSchema.format === 'email' ? 'email'
@@ -312,6 +315,8 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
                         type={inputType}
                         inputMode={inputMode}
                         step={fieldSchema.type === 'number' ? 'any' : undefined}
+                        min={isDateInput ? fieldSchema.formatMinimum : undefined}
+                        max={isDateInput ? fieldSchema.formatMaximum : undefined}
                         id={fieldId}
                         className={`input ${fieldName} peer ff-input${fieldError ? ' is-invalid' : ''}`}
                         placeholder={title}
@@ -361,6 +366,17 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
                 fieldErrors[name] = t('error-email', { field: `[${fieldTitle}]` });
             } else if ((prop.format === 'phone' || prop.format === 'tel') && !PHONE_RE.test(stripPhone(val))) {
                 fieldErrors[name] = t('error-phone', { field: `[${fieldTitle}]` });
+            } else if (prop.format === 'date') {
+                const ds = String(val);
+                if (!DATE_RE.test(ds)) {
+                    fieldErrors[name] = t('error-date', { field: `[${fieldTitle}]` });
+                } else if ((prop.formatMinimum && ds < prop.formatMinimum) || (prop.formatMaximum && ds > prop.formatMaximum)) {
+                    fieldErrors[name] = t('error-date-range', {
+                        field: `[${fieldTitle}]`,
+                        min: prop.formatMinimum || '…',
+                        max: prop.formatMaximum || '…'
+                    });
+                }
             }
         });
 

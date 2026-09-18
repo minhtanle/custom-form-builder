@@ -84,6 +84,16 @@
   transform: scale(0.85) translateY(-8px) translateX(2.4px);
 }
 
+/* Date: không hỗ trợ placeholder nên label luôn nổi; giữ lại icon lịch của trình duyệt */
+.ff-input[type="date"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+}
+.ff-input[type="date"] + .ff-label {
+  color: var(--cdf-text-label);
+  transform: scale(0.85) translateY(-8px) translateX(2.4px);
+}
+
 .check-mark {
   position: relative;
   top: -1px;

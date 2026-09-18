@@ -20,6 +20,8 @@ const messages = {
         'error-invalid': 'Dữ liệu của trường {field} không hợp lệ',
         'error-email': 'Email của trường {field} không hợp lệ',
         'error-phone': 'Số điện thoại của trường {field} không hợp lệ',
+        'error-date': 'Ngày của trường {field} không hợp lệ (định dạng YYYY-MM-DD)',
+        'error-date-range': 'Ngày của trường {field} phải trong khoảng {min} – {max}',
     },
     en: {
         'loading': 'Loading configuration...',
@@ -28,6 +30,8 @@ const messages = {
         'error-invalid': 'Data of field {field} is invalid',
         'error-email': 'Email of field {field} is invalid',
         'error-phone': 'Phone number of field {field} is invalid',
+        'error-date': 'Date of field {field} is invalid (format YYYY-MM-DD)',
+        'error-date-range': 'Date of field {field} must be between {min} and {max}',
     },
 };
 
