@@ -18,6 +18,7 @@ var TYPE_NAMES = {
     phone: 'Số điện thoại',
     textarea: 'Văn bản dài',
     date: 'Ngày',
+    time: 'Thời gian',
     select: 'Dropdown',
     radio: 'Radio',
     checkbox: 'Checkbox',
@@ -28,7 +29,7 @@ var TYPE_NAMES = {
 };
 var GLYPHS = {
     text: 'Aa', number: '123', email: '\u2709', url: 'URI', phone: 'TEL',
-    textarea: '\u00b6', date: '\u25f7', select: '\u25be', radio: '\u25c9', checkbox: '\u2611', hidden: '\u25cc',
+    textarea: '\u00b6', date: '\u25f7', time: 'h:m', select: '\u25be', radio: '\u25c9', checkbox: '\u2611', hidden: '\u25cc',
     paragraph: '\u00b6', divider: '\u2500', heading: 'H'
 };
 var CHILD_TYPES = SC.childFieldTypes();
@@ -131,7 +132,7 @@ function Builder() {
 
         function normalizeDefault(f, val) {
             if (val === '') return undefined;
-            if (f.type === 'number') {
+            if (f.type === 'number' || f.type === 'time') {
                 var n = Number(val);
                 return isNaN(n) ? undefined : n;
             }
@@ -466,6 +467,10 @@ function Builder() {
             } else if (f.type === 'date') {
                 wrap.appendChild(inlineRow('Ngày nhỏ nhất', dateInput(f.validate.min, 'date-min'), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
                 wrap.appendChild(inlineRow('Ngày lớn nhất', dateInput(f.validate.max, 'date-max'), 'Chặn chọn ngày ngoài khoảng khi submit'));
+            } else if (f.type === 'time') {
+                wrap.appendChild(settingRow('Thời gian tối thiểu (phút)', numInput(f.validate.min, 'min')));
+                wrap.appendChild(settingRow('Thời gian tối đa (phút)', numInput(f.validate.max, 'max')));
+                wrap.appendChild(el('p', 'col-hint', 'Đơn vị phút (1h30p = 90). Người điền kéo thanh trượt giới hạn trong khoảng này; payload submit là số giây.'));
             } else if (f.type === 'text' || f.type === 'textarea') {
                 wrap.appendChild(settingRow('Độ dài tối thiểu', numInput(f.validate.minLength, 'minlen')));
                 wrap.appendChild(settingRow('Độ dài tối đa', numInput(f.validate.maxLength, 'maxlen')));
@@ -527,6 +532,11 @@ function buildDefaultInput(f) {
                 var d = dateInput(f.defaultValue, 'defval');
                 d.title = 'Định dạng YYYY-MM-DD';
                 return d;
+            }
+            if (f.type === 'time') {
+                var t = numInput(f.defaultValue, 'defval');
+                t.title = 'Đơn vị phút (1h30p = 90)';
+                return t;
             }
             return textInput(f.defaultValue, 'defval');
         }
@@ -782,13 +792,18 @@ function buildDefaultInput(f) {
                 wrap.appendChild(addc);
                 wrap.appendChild(el('p', 'col-hint', 'Dropdown này không có field con (chỉ cấp 1).'));
             } else {
-                var defVal = (c.type === 'date') ? dateInput(c.defaultValue, 'child-defval') : textInput(c.defaultValue, 'child-defval');
-                wrap.appendChild(settingRow(('number' === c.type) ? 'Mặc định (số)' : 'Mặc định', defVal));
+                var defVal = (c.type === 'date') ? dateInput(c.defaultValue, 'child-defval')
+                    : (c.type === 'number' || c.type === 'time') ? numInput(c.defaultValue, 'child-defval')
+                    : textInput(c.defaultValue, 'child-defval');
+                wrap.appendChild(settingRow(('number' === c.type || 'time' === c.type) ? 'Mặc định (số)' : 'Mặc định', defVal));
             }
 
             if (c.type === 'number') {
                 wrap.appendChild(settingRow('Giá trị nhỏ nhất', withChild(numInput(c.validate.min, 'child-min'), c.id)));
                 wrap.appendChild(settingRow('Giá trị lớn nhất', withChild(numInput(c.validate.max, 'child-max'), c.id)));
+            } else if (c.type === 'time') {
+                wrap.appendChild(settingRow('Thời gian tối thiểu (phút)', withChild(numInput(c.validate.min, 'child-min'), c.id)));
+                wrap.appendChild(settingRow('Thời gian tối đa (phút)', withChild(numInput(c.validate.max, 'child-max'), c.id)));
             } else if (c.type === 'date') {
                 wrap.appendChild(inlineRow('Ngày nhỏ nhất', withChild(dateInput(c.validate.min, 'child-date-min'), c.id), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
                 wrap.appendChild(inlineRow('Ngày lớn nhất', withChild(dateInput(c.validate.max, 'child-date-max'), c.id), 'Chặn chọn ngày ngoài khoảng khi submit'));

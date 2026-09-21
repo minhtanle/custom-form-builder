@@ -22,6 +22,7 @@ const messages = {
         'error-phone': 'Số điện thoại của trường {field} không hợp lệ',
         'error-date': 'Ngày của trường {field} không hợp lệ (định dạng YYYY-MM-DD)',
         'error-date-range': 'Ngày của trường {field} phải trong khoảng {min} – {max}',
+        'error-time-range': 'Thời gian của trường {field} phải trong khoảng {min} – {max}',
     },
     en: {
         'loading': 'Loading configuration...',
@@ -32,6 +33,7 @@ const messages = {
         'error-phone': 'Phone number of field {field} is invalid',
         'error-date': 'Date of field {field} is invalid (format YYYY-MM-DD)',
         'error-date-range': 'Date of field {field} must be between {min} and {max}',
+        'error-time-range': 'Time of field {field} must be between {min} and {max}',
     },
 };
 

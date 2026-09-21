@@ -11,6 +11,11 @@ const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0
 const PHONE_RE = /^(?:\+?84|0)[1-9]\d{8,9}$/;
 const stripPhone = (s) => String(s).replace(/[\s.\-()]/g, '');
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Slider thời gian: giây → "H:MM" (VD 5400 → "1:30"). Bỏ qua số âm/không hợp lệ.
+const secToHm = (s) => {
+    const sec = Math.max(0, Math.round(Number(s) || 0));
+    return `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}`;
+};
 
 function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
     const [formData, setFormData] = useState({});
@@ -180,7 +185,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
                         const isChecked = formData[fieldName] === opt.const;
                         const optionId = `${fieldId}-ck-${opt.const}`;
                         const children = [];
-                        if (schema.allOf) {
+if (schema.allOf) {
                             schema.allOf.forEach(rule => {
                                 if (rule.if && rule.if.properties?.[fieldName]?.const === opt.const && rule.then?.required) {
                                     rule.then.required.forEach(f => children.push(f));
@@ -298,6 +303,36 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
             );
         }
 
+        // WIDGET DẠNG THỜI GIAN HOÀN THÀNH (slider giây, hiển thị HH:MM)
+        if (widgetType === 'time-slider') {
+            const maxSec = fieldSchema.maximum && fieldSchema.maximum > 0 ? fieldSchema.maximum : 86400;
+            const minSec = fieldSchema.minimum || 0;
+            const rawSec = formData[fieldName] ?? fieldSchema.default ?? 0;
+            const curSec = isNaN(Number(rawSec)) ? 0 : Math.max(minSec, Math.min(maxSec, Number(rawSec)));
+            return (
+                <div className={`ff field ${cs}${fieldError ? ' has-error' : ''}`}>
+                    <div className="ff-time">
+                        <label className="form-label" style={{ display: 'block', marginBottom: '5px' }}>
+                            {title}{isRequired && <span className="require cdf-text-error"> *</span>}
+                        </label>
+                        <div className="ff-time-row">
+                            <input
+                                type="range"
+                                className={`ff-time-slider${fieldError ? ' is-invalid' : ''}`}
+                                min={minSec}
+                                max={maxSec}
+                                step={60}
+                                value={curSec}
+                                onInput={(e) => handleFieldChange(fieldName, Number(e.target.value))}
+                            />
+                            <span className="ff-time-value">{secToHm(curSec)}</span>
+                        </div>
+                        {renderDesc(fieldSchema.description)}
+                    </div>
+                </div>
+            );
+        }
+
         // WIDGET DẠNG TEXT INPUT MẶC ĐỊNH (float-label ff-input)
         const isDateInput = fieldSchema.format === 'date';
         const inputType = fieldSchema.type === 'number' ? 'number'
@@ -375,6 +410,17 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
                         field: `[${fieldTitle}]`,
                         min: prop.formatMinimum || '…',
                         max: prop.formatMaximum || '…'
+                    });
+                }
+            } else if (prop.type === 'number' && uiSchema?.fields?.[name]?.['ui:widget'] === 'time-slider') {
+                const secs = Number(val);
+                if (isNaN(secs)) {
+                    fieldErrors[name] = t('error-invalid', { field: `[${fieldTitle}]` });
+                } else if ((prop.minimum !== undefined && secs < prop.minimum) || (prop.maximum !== undefined && secs > prop.maximum)) {
+                    fieldErrors[name] = t('error-time-range', {
+                        field: `[${fieldTitle}]`,
+                        min: secToHm(prop.minimum || 0),
+                        max: prop.maximum ? secToHm(prop.maximum) : '24:00'
                     });
                 }
             }

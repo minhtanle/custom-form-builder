@@ -333,5 +333,22 @@ assert.strictEqual(patBare.schema.properties.code.pattern, '^[A-Z]{2}[0-9]{4}$',
 assert.strictEqual(SC.normalizePattern('/abc/ig') , 'abc', 'normalizePattern bỏ cờ ngoài u');
 assert.strictEqual(SC.normalizePattern(''), undefined, 'normalizePattern rỗng → undefined');
 
+// --- Time: builder nhập phút → schema emit giây (minimum/maximum/default) + widget time-slider ---
+const timeCfg = SC.compile({ name: '', fields: [mk('time', 'finish', 'Thời gian hoàn thành', { validate: { min: 0, max: 90 }, defaultValue: 45 })] });
+assert.strictEqual(timeCfg.schema.properties.finish.type, 'number', 'time compiles type: number');
+assert.strictEqual(timeCfg.schema.properties.finish.minimum, 0, 'time min phút → giây');
+assert.strictEqual(timeCfg.schema.properties.finish.maximum, 5400, 'time max 90 phút → 5400 giây');
+assert.strictEqual(timeCfg.schema.properties.finish.default, 2700, 'time default phút → giây');
+assert.strictEqual(timeCfg.uiSchema.fields.finish['ui:widget'], 'time-slider', 'time emit widget time-slider');
+const timeBack = SC.importConfig(timeCfg).fields.find(f => f.key === 'finish');
+assert.strictEqual(timeBack.type, 'time', 'import khôi phục type time');
+assert.strictEqual(timeBack.validate.max, 90, 'import convert giây → phút (max)');
+assert.strictEqual(timeBack.defaultValue, 45, 'import convert giây → phút (default)');
+assert.deepStrictEqual(SC.compile(SC.importConfig(timeCfg)), timeCfg, 'time round-trip ổn định');
+
+const timePlain = SC.compile({ name: '', fields: [mk('time', 'finish2', 'Thời gian 2')] });
+assert.ok(!('minimum' in timePlain.schema.properties.finish2), 'time không cấu hình min → không phát minimum');
+assert.deepStrictEqual(SC.compile(SC.importConfig(timePlain)), timePlain, 'time plain round-trip ổn định');
+
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));
