@@ -268,7 +268,7 @@ function Builder() {
             meta.appendChild(el('span', 'badge', TYPE_NAMES[f.type] || f.type));
             meta.appendChild(el('span', 'badge key', f.key || ''));
             if (f.required) meta.appendChild(el('span', 'badge req', '* bắt buộc'));
-            meta.appendChild(el('span', 'badge grid', String(f.grid || 12)));
+            meta.appendChild(el('span', 'badge grid', (f.grid || 12) === 6 ? '50%' : '100%'));
             var kids = childCount(f);
             if (kids) meta.appendChild(el('span', 'badge child', 'children ' + kids));
             if (f.type === 'hidden') meta.appendChild(el('span', 'badge', 'ẩn'));
@@ -435,6 +435,28 @@ function Builder() {
             return wrap;
         }
 
+        var PATTERN_EXAMPLES = [
+            ['^[\\p{L}\\s]+$', 'Tên: chữ Unicode + khoảng trắng'],
+            ['^[\\p{L}]+$', 'Chỉ chữ Unicode, không dấu cách'],
+            ['^\\d{10,11}$', 'Số điện thoại 10–11 chữ số'],
+            ['^[a-zA-Z0-9_]{6,20}$', 'Username 6–20 ký tự (chữ/số/gạch dưới)'],
+            ['^[A-Z0-9]{4,12}$', 'Mã định danh chữ hoa + số'],
+            ['^\\d{4}-\\d{2}-\\d{2}$', 'Ngày đúng dạng YYYY-MM-DD']
+        ];
+
+        function buildPatternExamples() {
+            var box = el('div', 'pattern-examples');
+            box.appendChild(el('span', 'pattern-examples-title', 'Ví dụ:'));
+            var list = document.createElement('ul');
+            list.className = 'pattern-examples-list';
+            PATTERN_EXAMPLES.forEach(function (pair) {
+                var li = el('li', null, pair[0] + ' — ' + pair[1]);
+                list.appendChild(li);
+            });
+            box.appendChild(list);
+            return box;
+        }
+
         function buildValidationSection(f) {
             var wrap = el('div', 'setting-group');
             wrap.appendChild(el('label', 'setting-label', 'Ràng buộc'));
@@ -447,7 +469,14 @@ function Builder() {
             } else if (f.type === 'text' || f.type === 'textarea') {
                 wrap.appendChild(settingRow('Độ dài tối thiểu', numInput(f.validate.minLength, 'minlen')));
                 wrap.appendChild(settingRow('Độ dài tối đa', numInput(f.validate.maxLength, 'maxlen')));
-                if (f.type === 'text') wrap.appendChild(settingRow('Pattern (regex)', textInput(f.validate.pattern, 'pattern')));
+                if (f.type === 'text') {
+                    var pRow = settingRow('Pattern (regex)', textInput(f.validate.pattern, 'pattern'));
+                    var pIn = pRow.querySelector('.input');
+                    pIn.placeholder = 'VD: ^[\\p{L}\\s]+$ (chỉ thân regex)';
+                    pIn.title = 'Nhập thân regex, không kèm dấu bao /…/ và cờ. Cờ /u luôn được bật nên \\p{L}, \\uXXXX chạy được.';
+                    wrap.appendChild(pRow);
+                    wrap.appendChild(buildPatternExamples());
+                }
             } else {
                 wrap.appendChild(el('p', 'col-hint', 'Không có ràng buộc cho loại này.'));
             }
@@ -834,6 +863,18 @@ function buildDefaultInput(f) {
                     hnote.innerHTML = 'Hiển thị dạng tiêu đề (H3). Chỉ văn bản thuần, không hỗ trợ thẻ HTML.';
                     hgroup.appendChild(hnote);
                     box.appendChild(hgroup);
+                    var fsGroup = el('div', 'setting-group');
+                    fsGroup.appendChild(el('label', 'setting-label', 'Cỡ chữ'));
+                    var fsBtns = el('div', 'btn-group');
+                    [['large', 'Large (hiện tại)'], ['normal', 'Normal (như nhãn input)']].forEach(function (pair) {
+                        var fb = el('button', 'btn-opt' + (((f.fontSize || 'large') === pair[0]) ? ' active' : ''), pair[1]);
+                        fb.setAttribute('data-role', 'heading-font-toggle');
+                        fb.setAttribute('data-fs', pair[0]);
+                        fb.type = 'button';
+                        fsBtns.appendChild(fb);
+                    });
+                    fsGroup.appendChild(fsBtns);
+                    box.appendChild(fsGroup);
                 } else if (f.type === 'paragraph') {
                     var pgroup = el('div', 'setting-group');
                     pgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
@@ -1070,7 +1111,7 @@ function buildDefaultInput(f) {
             else if (bind === 'date-max') f.validate.max = t.value || undefined;
             else if (bind === 'minlen') f.validate.minLength = t.value === '' ? undefined : Number(t.value);
             else if (bind === 'maxlen') f.validate.maxLength = t.value === '' ? undefined : Number(t.value);
-            else if (bind === 'pattern') f.validate.pattern = t.value || undefined;
+            else if (bind === 'pattern') f.validate.pattern = SC.normalizePattern(t.value) || undefined;
             else if (bind === 'opt-value') { var oi = Number(t.getAttribute('data-opt')); if (f.options[oi]) f.options[oi].value = t.value; }
             else if (bind === 'opt-label') { var ob = Number(t.getAttribute('data-opt')); if (f.options[ob]) f.options[ob].label = t.value; }
             else if (bind === 'opt-label-en') { var oeb = Number(t.getAttribute('data-opt')); if (f.options[oeb]) f.options[oeb].labelEn = t.value; }
@@ -1203,6 +1244,15 @@ function buildDefaultInput(f) {
                 } else {
                     f.grid = Number(t.getAttribute('data-grid'));
                 }
+                touchCard(f);
+                renderSettings();
+                renderJSON();
+                schedulePreview();
+                return;
+            }
+
+            if (role === 'heading-font-toggle') {
+                f.fontSize = t.getAttribute('data-fs');
                 touchCard(f);
                 renderSettings();
                 renderJSON();

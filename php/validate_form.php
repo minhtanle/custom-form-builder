@@ -38,17 +38,70 @@ function csValidateFormData(array $data, string $schemaPath): array
         $validator->setStopAtFirstError(false);
     }
     $result = csRunValidation($validator, $data, $schema);
+    $rangeErrors = csCheckDateRanges($data, $schema);
 
     if ($result === true) {
-        return ['ok' => true, 'errors' => []];
+        return ['ok' => count($rangeErrors) === 0, 'errors' => $rangeErrors];
     }
 
-    $errors = csCollectErrors($result);
+    $errors = array_merge(csCollectErrors($result), $rangeErrors);
 
     return [
         'ok' => count($errors) === 0,
         'errors' => $errors,
     ];
+}
+
+/**
+ * formatMinimum / formatMaximum (chuẩn ajv-formats, draft-07 không hỗ trợ
+ * nên Opis bỏ qua) → tự kiểm tra ở đây để lớp PHP chặn giống hệt JS engine.
+ *
+ * @return array<int, array{field:string,code:string,message:string}>
+ */
+function csCheckDateRanges(array $data, object $schema): array
+{
+    $errors = [];
+    $props = $schema->properties ?? null;
+    if (!is_object($props)) {
+        return $errors;
+    }
+
+    foreach (get_object_vars($props) as $field => $prop) {
+        if (!is_object($prop) || ($prop->format ?? null) !== 'date') {
+            continue;
+        }
+        $min = $prop->formatMinimum ?? null;
+        $max = $prop->formatMaximum ?? null;
+        if ($min === null && $max === null) {
+            continue;
+        }
+        $val = $data[$field] ?? null;
+        // Chỉ kiểm tra range cho ngày hợp lệ thực tế; ngày xấu để keyword format báo.
+        if (!is_string($val) || $val === '') {
+            continue;
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $val, $m)
+            || !checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            continue;
+        }
+
+        $tooLow = $min !== null && strcmp($val, $min) < 0;
+        $tooHigh = $max !== null && !$tooLow && strcmp($val, $max) > 0;
+        if (!$tooLow && !$tooHigh) {
+            continue;
+        }
+
+        if ($min !== null && $max !== null) {
+            $message = sprintf('[%s] date must be between %s and %s.', $field, $min, $max);
+        } elseif ($min !== null) {
+            $message = sprintf('[%s] date must not be earlier than %s.', $field, $min);
+        } else {
+            $message = sprintf('[%s] date must not be later than %s.', $field, $max);
+        }
+        $errors[] = ['field' => $field, 'code' => 'dateRange', 'message' => $message];
+    }
+
+    return $errors;
 }
 
 /**
@@ -154,7 +207,8 @@ function csFlattenError($error, array &$errors, string $contextField = ''): void
         && is_object($error->data())
         && method_exists($error->data(), 'fullPath')
     ) {
-        $dataPointer = (string) $error->data()->fullPath();
+        $fp = $error->data()->fullPath();
+        $dataPointer = is_array($fp) ? implode('/', $fp) : (string) $fp;
     }
     $args = method_exists($error, 'args') ? (array) $error->args() : [];
 

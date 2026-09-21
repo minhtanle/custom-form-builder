@@ -548,6 +548,30 @@ body {
     border-color: var(--accent);
 }
 
+/* Mẫu regex cho field text: danh sách tham khảo */
+.pattern-examples {
+    padding: 4px 14px 12px;
+}
+.pattern-examples-title {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+}
+.pattern-examples-list {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text);
+}
+.pattern-examples-list li {
+    font-family: ui-monospace, Consolas, monospace;
+}
+.pattern-examples-list li span.pattern-desc {
+    font-family: inherit;
+}
+
 .settings-header-right {
     display: flex;
     align-items: center;

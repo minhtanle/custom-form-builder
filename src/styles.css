@@ -259,6 +259,9 @@
   line-height: 1.4;
   color: var(--cdf-text);
 }
+.ff-heading.ff-heading-normal {
+  font-size: 1rem;
+}
 
 /*
  * Link trong nội dung html (đoạn văn / checkbox label):

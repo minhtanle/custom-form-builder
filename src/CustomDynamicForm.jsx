@@ -440,7 +440,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
                     row.layoutElement.type === 'divider'
                         ? <hr className="ff-divider col-span-2" />
                         : row.layoutElement.type === 'heading'
-                            ? <h3 className="ff-heading col-span-2">{tr(row.layoutElement.text)}</h3>
+                            ? <h3 className={"ff-heading col-span-2" + (row.layoutElement.fontSize === 'normal' ? ' ff-heading-normal' : '')}>{tr(row.layoutElement.text)}</h3>
                             : <p className="ff-paragraph col-span-2" dangerouslySetInnerHTML={{ __html: safeHtml(tr(row.layoutElement.text)) }} />
                 ) : (row.fields || []).map(field => {
                         const fieldName = field.name;

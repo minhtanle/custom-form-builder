@@ -323,5 +323,15 @@ assert.ok(!('formatMinimum' in datePlain.schema.properties.ngay2), 'date không 
 assert.ok(!('formatMaximum' in datePlain.schema.properties.ngay2), 'date không cấu hình max → không phát formatMaximum');
 assert.deepStrictEqual(SC.compile(SC.importConfig(datePlain)), datePlain, 'date plain round-trip ổn định');
 
+// --- Pattern regex: dấu bao /.../ + cờ được tỉa về thân regex (validator engine luôn thêm 'u') ---
+const patDirs = SC.compile({ name: '', fields: [mk('text', 'name', 'Họ tên', { validate: { pattern: '/^[\\p{L}\\s]+$/u' } })] });
+assert.strictEqual(patDirs.schema.properties.name.pattern, '^[\\p{L}\\s]+$', 'pattern có dấu bao/cờ → chỉ giữ thân regex');
+assert.deepStrictEqual(SC.compile(SC.importConfig(patDirs)), patDirs, 'pattern round-trip ổn định');
+
+const patBare = SC.compile({ name: '', fields: [mk('text', 'code', 'Mã', { validate: { pattern: '^[A-Z]{2}[0-9]{4}$' } })] });
+assert.strictEqual(patBare.schema.properties.code.pattern, '^[A-Z]{2}[0-9]{4}$', 'pattern thuần không bị đổi');
+assert.strictEqual(SC.normalizePattern('/abc/ig') , 'abc', 'normalizePattern bỏ cờ ngoài u');
+assert.strictEqual(SC.normalizePattern(''), undefined, 'normalizePattern rỗng → undefined');
+
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));
