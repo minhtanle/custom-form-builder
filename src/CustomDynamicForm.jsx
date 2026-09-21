@@ -172,7 +172,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
             return (
                 <div key={fieldName} className={`f-rows ${cs}${radioLayout === 'horizontal' ? ' radio-h' : ''}`}>
                     {showRadioLabel && (
-                        <label className="form-label" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>
+                        <label className="form-label" style={{ display: 'block', marginBottom: '5px' }}>
                             {title}{isRequired && <span className="require cdf-text-error"> *</span>}
                         </label>
                     )}
