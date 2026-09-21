@@ -76,6 +76,9 @@ function Builder() {
                 ? (o.labelEn != null && o.labelEn !== '' ? o.labelEn : o.label)
                 : o.label;
         }
+        function stripHtml(s) {
+            return String(s).replace(/<[^>]*>/g, '');
+        }
 
         function walkFields(cb) {
             state.config.fields.forEach(function (f) {
@@ -408,7 +411,16 @@ function Builder() {
             var isEn = state.editLocale === 'en';
             var bind = isEn ? 'label-en' : 'label';
             var val = isEn ? f.labelEn : f.label;
-            var ph = isEn ? 'Nhập nhãn tiếng Anh… Có thể dùng thẻ <a href="https://…">…</a>' : 'Nhập nhãn… Có thể dùng thẻ <a href="https://…">…</a>';
+            var ph;
+            if (isEn) {
+                ph = val
+                    ? 'Nhập nhãn tiếng Anh… Có thể dùng thẻ <a href="https://…">…</a>'
+                    : (f.label
+                        ? 'Đang hiển thị (VI): ' + stripHtml(f.label)
+                        : 'Nhập nhãn tiếng Anh… Có thể dùng thẻ <a href="https://…">…</a>');
+            } else {
+                ph = 'Nhập nhãn… Có thể dùng thẻ <a href="https://…">…</a>';
+            }
             if (f.type !== 'checkbox') { var i = textInput(val, bind); i.placeholder = ph; return i; }
             var ta = document.createElement('textarea');
             ta.className = 'input';
@@ -503,6 +515,9 @@ function buildDefaultInput(f) {
             descInput.value = state.editLocale === 'en' ? (f.descriptionEn || '') : (f.description || '');
             descInput.setAttribute('data-bind', state.editLocale === 'en' ? 'description-en' : 'description');
             descInput.spellcheck = false;
+            descInput.placeholder = state.editLocale === 'en'
+                ? (f.description ? 'Đang hiển thị (VI): ' + stripHtml(f.description) : 'Nhập mô tả tiếng Anh…')
+                : 'Nhập mô tả…';
             descRow.appendChild(descInput);
             wrap.appendChild(descRow);
 
@@ -802,7 +817,7 @@ function buildDefaultInput(f) {
                 var isEn = state.editLocale === 'en';
                 if (f.type === 'heading') {
                     var hgroup = el('div', 'setting-group');
-                    hgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
+                    hgroup.appendChild(el('label', 'setting-label', isEn ? 'Heading (tiếng Anh)' : 'Tiêu đề'));
                     var hta = document.createElement('textarea');
                     hta.style.width = '100%';
                     hta.className = 'input';
@@ -810,7 +825,9 @@ function buildDefaultInput(f) {
                     hta.value = isEn ? (f.labelEn || '') : (f.label || '');
                     hta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
                     hta.spellcheck = false;
-                    hta.placeholder = isEn ? 'Nhập nội dung tiếng Anh…' : 'Nhập tiêu đề hiển thị trong form…';
+                    hta.placeholder = isEn
+                        ? (f.label ? 'Đang hiển thị (VI): ' + stripHtml(f.label) : 'Nhập nội dung tiếng Anh…')
+                        : 'Nhập tiêu đề hiển thị trong form…';
                     hgroup.appendChild(hta);
                     var hnote = document.createElement('p');
                     hnote.className = 'html-note';
@@ -827,7 +844,9 @@ function buildDefaultInput(f) {
                     pta.value = isEn ? (f.labelEn || '') : (f.label || '');
                     pta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
                     pta.spellcheck = false;
-                    pta.placeholder = isEn ? 'Nhập nội dung tiếng Anh…' : 'Nhập đoạn văn hiển thị trong form…';
+                    pta.placeholder = isEn
+                        ? (f.label ? 'Đang hiển thị (VI): ' + stripHtml(f.label) : 'Nhập nội dung tiếng Anh…')
+                        : 'Nhập đoạn văn hiển thị trong form…';
                     pgroup.appendChild(pta);
                     pgroup.appendChild(quickLinkButton(pta));
                     var pnote = document.createElement('p');
