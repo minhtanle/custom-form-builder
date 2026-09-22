@@ -20,6 +20,7 @@
 
     <div style="margin-top: 20px;">
         <button type="button" id="my-submit-btn" style="padding: 10px 24px; font-family: 'Roboto', sans-serif; font-size: 16px; border: none; border-radius: 8px; background-color: #4F62F8; color: #fff; cursor: pointer;">Gửi thông tin</button>
+        <button type="button" id="my-edit-btn" style="padding: 10px 24px; font-family: 'Roboto', sans-serif; font-size: 16px; border: none; border-radius: 8px; background-color: #F59E0B; color: #fff; cursor: pointer;">Mở lại bản ghi (edit)</button>
     </div>
 
     <script type="module" src="/src/CustomDynamicForm.jsx"></script>
@@ -124,6 +125,17 @@
             // Nút submit để ngoài form → gọi qua phương thức public submitForm()
             document.getElementById('my-submit-btn').addEventListener('click', () => {
                 formEl.submitForm();
+            });
+
+            // Luồng EDIT lại thông tin: gắn data (bản ghi đã lưu) 1 lần khi mở form → form prefill giá trị cũ
+            document.getElementById('my-edit-btn').addEventListener('click', () => {
+                formEl.data = {
+                    "relation": 2, // → field con "ten_don_vi_gioi_thieu" hiện lại vì required theo allOf
+                    "ten_don_vi_gioi_thieu": "VRB Vũng Tàu",
+                    "tinh_thanh": "Đà Nẵng",
+                    "ten_truong": "ĐH Bách Khoa",
+                    "dang_ky_nhan_tin": false
+                };
             });
         });
     </script>

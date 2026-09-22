@@ -155,8 +155,9 @@ custom-form-builder/
 - CSS nằm sẵn trong Shadow DOM → không phụ thuộc Tailwind/Bootstrap của trang chủ.
 - API công khai:
   - `formEl.schema = …` / `formEl.uiSchema = …` — thuộc tính setter, tự render lại.
+  - `formEl.data = {…}` — **luồng edit lại thông tin**: gắn 1 lần khi mở form bản ghi đã lưu → form prefill giá trị cũ (data override `default` trong schema). Gắn `null`/không gắn = form mới.
   - `formEl.submitForm()` — gọi validate + emit từ nút ngoài form.
-  - Event `onFormSubmit` — emit khi validate thành công, `e.detail` là dữ liệu form.
+  - Event `onFormSubmit` — emit khi validate thành công, `e.detail` là dữ liệu form (lưu nguyên bản để gán lại vào `formEl.data` lần sửa sau).
 
 ### 3.2 Builder
 
@@ -281,6 +282,29 @@ formEl.addEventListener('onFormSubmit', (e) => {
 **Khi form có lỗi — event `onFormSubmit` KHÔNG được phát.** Engine tự hiển thị lỗi ngay cạnh từng field (message đã chuẩn hóa qua i18n, kiểu `"Vui lòng kiểm tra lại trường [Tên]"`) và KHÔNG có event/payload lỗi nào khác; bạn không nên tự render lỗi FE trong listener này.
 
 > Vì thế FE chỉ xử lý nhánh *thành công* trong `onFormSubmit`. Mọi trường hợp lỗi còn thiếu sót phải được chặn lại ở backend — xem phần [6. Validator PHP (backend)](#6-validator-php-backend) (backend trả `ok: false` + danh sách lỗi `{field, code, message}` khi HTTP 422).
+
+### 4.4 Luồng edit lại thông tin (`formEl.data`)
+
+Mở form với **bản ghi đã lưu** để sửa: gắn `data` một lần khi mở (giá trị phải cùng key/kiểu dữ liệu như payload từ `onFormSubmit` — time là giây, date là `YYYY-MM-DD`, radio/select là `const` của option). Form sẽ prefill từng field; data override `default` trong schema. Không gắn `data` = form mới (dùng `default` ở builder):
+
+```js
+// Mở trang edit (hoặc modal) cho bản ghi id = 42:
+const formEl = document.getElementById('my-dynamic-form');
+formEl.schema = savedSchema;      // nạp cấu hình như thường
+formEl.uiSchema = savedUiSchema;
+formEl.data = {
+  "relation": 2,                  // field con "ten_don_vi_gioi_thieu" hiện lại theo if/then
+  "ten_don_vi_gioi_thieu": "VRB Vũng Tàu",
+  "tinh_thanh": "Đà Nẵng",
+  "dang_ky_nhan_tin": false       // đè default: true của schema
+};
+
+formEl.addEventListener('onFormSubmit', (e) => {
+  fetch(`/api/register/${42}`, { method: 'PUT', body: JSON.stringify(e.detail) });
+});
+```
+
+Lưu ý: mỗi lần gán `data` là một "lần mở bản ghi" — form được khởi tạo lại (state không lẫn với bản ghi trước), nên chỉ gắn khi thật sự cần; sau đó người dùng sửa bình thường và bấm submit.
 
 ---
 

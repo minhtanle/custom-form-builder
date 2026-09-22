@@ -4,7 +4,7 @@ import Sortable from 'sortablejs';
 import * as SCNS from '../../lib/schema-compile.js';
 // Dev: nạp engine trực tiếp (prod dùng dist/builder/custom-dynamic-form.js qua <script>).
 if (import.meta.env.DEV) { import('../CustomDynamicForm.jsx'); }
-import './builder.css';
+import './builder.css'; 
 
 // schema-compile.js is UMD: vite dev serves it without CJS interop (global gets set on
 // evaluation), while rolldown build wraps it in CJS (default export = the lib object).
@@ -213,6 +213,47 @@ function Builder() {
             }
             $('preview-status').textContent = 'Cập nhật ' + new Date().toLocaleTimeString() + ' [' + (state.previewLocale || 'vi') + ']';
             renderKeyWarning();
+        }
+
+        function renderTestForm() {
+            var stage = $('test-stage');
+            if (!stage) return;
+            if (!$('test-config').value.trim()) {
+                stage.innerHTML = '';
+                $('test-status').textContent = 'Nhập {schema, uiSchema} hoặc FormConfig rồi bấm "Làm mới test".';
+                return;
+            }
+            stage.innerHTML = '';
+            var schema = {}, uiSchema = {}, theData = null;
+            try {
+                var cfg0 = JSON.parse($('test-config').value || '{}');
+                if (cfg0.schema) { schema = cfg0.schema; uiSchema = cfg0.uiSchema || {}; }
+                else if (cfg0.fields) { var sc = SC.compile(cfg0); schema = sc.schema; uiSchema = sc.uiSchema || {}; }
+                else { schema = cfg0; }
+            }
+            catch (e) { $('test-status').textContent = 'config không phải JSON hợp lệ (dùng {schema, uiSchema} hoặc FormConfig)'; return; }
+            var dv = ($('test-data').value || '').trim();
+            if (dv) { try { theData = JSON.parse(dv); } catch (e) { $('test-status').textContent = 'data không phải JSON hợp lệ'; return; } }
+            var el = document.createElement('custom-dynamic-form');
+            el.id = 'test-form';
+            stage.appendChild(el);
+            delete el.schema; delete el.uiSchema; delete el.data;
+            el.schema = schema;
+            el.uiSchema = uiSchema;
+            if (theData) el.data = theData;
+            el.addEventListener('onFormSubmit', function (e) {
+                var o = $('test-json'); if (o) o.textContent = JSON.stringify(e.detail, null, 2);
+            });
+            var st = $('test-status');
+            if (st) st.textContent = 'Form test ' + (theData ? '(edit — đã prefill data)' : '(form mới)');
+        }
+
+        function setTestLocale(loc) {
+            document.querySelectorAll('.test-bar .locale-btn').forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-act') === 'set-test-locale-' + loc);
+            });
+            var el = $('test-stage') ? $('test-stage').firstElementChild : null;
+            if (el) el.lang = loc;
         }
 
         function setPreviewLocale(loc) {
@@ -1438,9 +1479,36 @@ function buildDefaultInput(f) {
             },
             export: exportJson,
             copy: copyJson,
+            'extract-fields': function () {
+                var sc = compiled();
+                var out = {};
+                Object.keys(sc.schema.properties || {}).forEach(function (k) {
+                    out[k] = '';
+                });
+                var box = $('field-extract-json');
+                box.value = JSON.stringify(out, null, 2);
+                $('field-extract-json-wrap').classList.remove('hidden');
+                box.focus();
+                box.select();
+                toast('Đã trích xuất ' + Object.keys(out).length + ' field (data trống)', 'ok');
+            },
+            'test-edit': function () {
+                var sc = compiled();
+                $('test-config').value = JSON.stringify({ schema: sc.schema, uiSchema: sc.uiSchema }, null, 2);
+                var out = {};
+                Object.keys(sc.schema.properties || {}).forEach(function (k) { out[k] = ''; });
+                $('test-data').value = JSON.stringify(out, null, 2);
+                var tb = document.querySelector('.tab[data-tab="test"]');
+                if (tb) tb.click();
+                toast('Đã chuyển schema + field sang tab Test Edit', 'ok');
+            },
             'close-settings': closeSettings,
             'refresh-preview': function () { refreshPreview(); toast('Đã làm mới preview', 'ok'); },
             'submit-preview': function () { previewForm.submitForm(); },
+            'refresh-test': function () { renderTestForm(); toast('Đã khởi tạo lại form (data hiện tại nếu có)', 'ok'); },
+            'submit-test': function () { var el = $('test-stage').firstElementChild; if (el && el.submitForm) el.submitForm(); },
+            'set-test-locale-vi': function () { setTestLocale('vi'); },
+            'set-test-locale-en': function () { setTestLocale('en'); },
             'set-preview-locale-vi': function () { setPreviewLocale('vi'); },
             'set-preview-locale-en': function () { setPreviewLocale('en'); },
             'edit-locale-vi': function () { setEditLocale('vi'); },
@@ -1466,12 +1534,23 @@ function buildDefaultInput(f) {
             btn.addEventListener('click', function () {
                 state.tab = btn.getAttribute('data-tab');
                 tabBtns.forEach(function (b) { b.classList.toggle('active', b === btn); });
-                ['preview', 'json'].forEach(function (name) {
+                ['preview', 'json', 'test'].forEach(function (name) {
                     $('panel-' + name).classList.toggle('active', state.tab === name);
                 });
                 if (state.tab === 'json') renderJSON();
+                if (state.tab === 'test') renderTestForm();
             });
         });
+
+        /* ---- Test auto-apply ---- */
+
+        var testApplyTimer = null;
+        function scheduleTestApply() {
+            clearTimeout(testApplyTimer);
+            testApplyTimer = setTimeout(renderTestForm, 350);
+        }
+        $('test-config').addEventListener('input', scheduleTestApply);
+        $('test-data').addEventListener('input', scheduleTestApply);
 
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
@@ -1709,9 +1788,10 @@ function buildDefaultInput(f) {
                     <div className="tabs" id="tabs">
                         <button type="button" className="tab active" data-tab="preview">Xem trước</button>
                         <button type="button" className="tab" data-tab="json">JSON xuất</button>
+                        <button type="button" className="tab" data-tab="test">Test Edit</button>
                     </div>
-
-                    <div className="panel active" id="panel-preview">
+ 
+                     <div className="panel active" id="panel-preview">
                         <div className="preview-bar">
                             <span className="locale-group" title="Ngôn ngữ hiển thị form (chọn theo locales trong title)">
                                 <button type="button" className="locale-btn active" data-act="set-preview-locale-vi" data-locale="vi">vi</button>
@@ -1735,7 +1815,31 @@ function buildDefaultInput(f) {
                         <div className="json-actions">
                             <button type="button" className="btn btn-sm" data-act="copy">Sao chép</button>
                             <button type="button" className="btn btn-sm" data-act="export">Tải về .schema.json</button>
+                            <button type="button" className="btn btn-sm" data-act="extract-fields" title="Lấy các field có trong form kèm dữ liệu trống (dùng làm data mẫu cho tab Test Edit)">Trích xuất field</button>
+                            <button type="button" className="btn btn-sm" data-act="test-edit" title="Chuyển schema + field (data trống) sang tab Test Edit">Test Edit</button>
                         </div>
+                        <div id="field-extract-json-wrap" className="hidden">
+                            <p className="col-hint">Field + data trống — có thể dán vào ô "data (prefill khi edit)" của tab Test Edit.</p>
+                            <textarea id="field-extract-json" className="json-in" readOnly spellcheck="false"></textarea>
+                        </div>
+                    </div>
+
+                    <div className="panel" id="panel-test">
+                        <div className="test-inputs" id="test-inputs">
+                            <label>config (schema + uiSchema chung) <textarea id="test-config" className="json-in" spellcheck="false" placeholder='{"schema":{"type":"object","properties":{...}},"uiSchema":{"properties":{...}}}'></textarea></label>
+                            <label>data (prefill khi edit) <textarea id="test-data" className="json-in" spellcheck="false" placeholder='{"field_1":"giá trị","field_2":"..."}'></textarea></label>
+                        </div>
+                        <div className="test-bar">
+                            <span className="locale-group" title="Ngôn ngữ hiển thị form test (chọn theo locales trong schema)">
+                                <button type="button" className="locale-btn active" data-act="set-test-locale-vi">vi</button>
+                                <button type="button" className="locale-btn" data-act="set-test-locale-en">en</button>
+                            </span>
+                            <span id="test-status"></span>
+                            <button type="button" className="btn btn-sm" data-act="refresh-test">Làm mới</button>
+                            <button type="button" className="btn btn-sm" data-act="submit-test">Submit Form</button>
+                        </div>
+                        <div className="test-stage" id="test-stage"></div>
+                        <pre id="test-json" className="preview-json" spellcheck="false"></pre>
                     </div>
                 </aside>
             </main>

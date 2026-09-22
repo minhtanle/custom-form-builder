@@ -342,6 +342,29 @@ body {
 }
 .json-actions { display: flex; gap: 8px; margin-top: 10px; }
 
+.json-in {
+    width: 100%;
+    min-height: 220px;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+    background: #f6f7fb;
+    color: var(--text);
+    white-space: pre;
+    overflow-x: auto;
+}
+.json-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, .15); }
+.test-inputs { display: flex; gap: 10px; }
+.test-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+.test-inputs label textarea { min-height: 170px; }
+.test-bar { display: flex; align-items: center; gap: 8px; padding: 10px 2px; color: var(--muted); font-size: 12px; }
+.test-bar #test-status { margin-left: auto; }
+
 .preview-bar {
     display: flex;
     align-items: center;

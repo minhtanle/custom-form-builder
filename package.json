@@ -5,12 +5,12 @@
   "main": "index.js",
   "scripts": {
     "test": "node tests/test-schema.mjs",
-    "dev": "vite",
-    "build": "vite build",
-    "build:all": "npm run build && npm run build:builder",
-    "dev:builder": "vite --mode builder",
+    "dev": "vite --mode builder --open",
+    "build": "npm run build:engine && npm run build:builder",
+    "build:engine": "vite build",
     "build:builder": "vite build --mode builder",
-    "preview:builder": "vite preview --mode builder"
+    "prod": "npm run build && npm run preview:builder",
+    "preview:builder": "vite preview --mode builder --open"
   },
   "keywords": [],
   "author": "",

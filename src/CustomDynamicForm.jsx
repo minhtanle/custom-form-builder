@@ -17,8 +17,49 @@ const secToHm = (s) => {
     return `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}`;
 };
 
-function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
-    const [formData, setFormData] = useState({});
+// Ép giá trị theo kiểu field khi prefill (data) và khi build payload submit.
+// - number/integer: chuỗi "1.5" → 1.5 (dấu chấm); number giữ nguyên; chuỗi chỉ khoảng trắng coi như rỗng '';
+//   ép hỏng (NaN) → giữ chuỗi gốc + console.warn (lưu ý: số > 2^53 mất chính xác khi dùng Number).
+// - boolean: "true"/"1"/"false"/"0" → true/false; '' → false (checkbox bỏ tick); boolean/null giữ nguyên;
+//   khác → giữ chuỗi gốc + console.warn.
+// - còn lại (text/textarea/date/select/radio/checkbox đã coerce boolean..., hidden) → giữ nguyên.
+function coerceValue(value, fieldSchema, fieldName) {
+    var type = fieldSchema && fieldSchema.type;
+    if (type === 'number' || type === 'integer') {
+        if (value === '' || value == null) return value;
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string' && value.trim() === '') return '';
+        var n = Number(value);
+        if (!isNaN(n)) return n;
+        warnCoerce('number', value, fieldName);
+        return value;
+    }
+    if (type === 'boolean' || type === 'checkbox') {
+        if (value === true || value === false || value == null) return value;
+        if (value === '') return false;
+        if (value === 'true' || value === '1') return true;
+        if (value === 'false' || value === '0') return false;
+        warnCoerce('boolean', value, fieldName);
+        return value;
+    }
+    return value;
+}
+
+function warnCoerce(type, value, fieldName) {
+    console.warn('[CustomDynamicForm] Ép ' + type + ' thất bại: "' + value + '"' + (fieldName ? ' (field: ' + fieldName + ')' : '') + ' → giữ nguyên, kiểm tra kiểu field');
+}
+
+function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang, data }) {
+    // Khởi tạo từ dữ liệu bản ghi (luồng edit): data chỉ gắn 1 lần khi mở form.
+    // Key có trong data (kể cả 0/false) được dùng; key còn lại undefined để effect default lấp nốt.
+    const [formData, setFormData] = useState(() => {
+        if (!schema || !data) return {};
+        const init = {};
+        Object.keys(schema.properties || {}).forEach(name => {
+            if (data[name] !== undefined) init[name] = coerceValue(data[name], schema.properties[name], name);
+        });
+        return init;
+    });
     const [visibleFields, setVisibleFields] = useState([]);
     const [errors, setErrors] = useState({});
     const [openDropdown, setOpenDropdown] = useState(null); // Quản lý đóng mở dropdown theo tên trường
@@ -59,7 +100,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
         if (Object.keys(defaults).length) {
             setFormData(prev => {
                 const merged = { ...prev };
-                Object.keys(defaults).forEach(k => { if (merged[k] === undefined) merged[k] = defaults[k]; });
+                Object.keys(defaults).forEach(k => { if (merged[k] === undefined) merged[k] = coerceValue(defaults[k], schema.properties[k], k); });
                 return merged;
             });
         }
@@ -175,7 +216,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, lang }) {
             const showRadioLabel = radioOpts.hideLabel !== true;
             const radioLayout = radioOpts.optionsLayout === 'horizontal' ? 'horizontal' : 'vertical';
             return (
-                <div key={fieldName} className={`f-rows ${cs}${radioLayout === 'horizontal' ? ' radio-h' : ''}`}>
+                <div key={fieldName} className={`f-rows ${cs}${radioLayout === 'horizontal' ? ' radio-h' : ''}${fieldError ? ' has-error' : ''}`}>
                     {showRadioLabel && (
                         <label className="form-label" style={{ display: 'block', marginBottom: '5px' }}>
                             {title}{isRequired && <span className="require cdf-text-error"> *</span>}
@@ -455,7 +496,7 @@ if (schema.allOf) {
         // (vd: đổi radio sang nhánh khác → value cũ của field con không được submit)
         const payload = {};
         visibleFields.forEach(name => {
-            if (name in formData) payload[name] = formData[name];
+            if (name in formData) payload[name] = coerceValue(formData[name], schema.properties[name], name);
         });
         const fieldErrors = validateForm(payload);
         if (Object.keys(fieldErrors).length === 0) {
@@ -508,6 +549,8 @@ class CustomDynamicForm extends HTMLElement {
         super();
         this._schema = null;
         this._uiSchema = null;
+        this._data = null;
+        this._dataKey = 0;
         this._api = {};
 
         // Shadow DOM: cô lập CSS + markup, không ảnh hưởng host page
@@ -533,6 +576,9 @@ class CustomDynamicForm extends HTMLElement {
 
     set schema(val) { this._schema = val; this.renderComponent(); }
     set uiSchema(val) { this._uiSchema = val; this.renderComponent(); }
+    // Dữ liệu bản ghi cho luồng edit: gắn 1 lần khi mở form. Bump `_dataKey` để remount
+    // core mới (state formData khởi tạo đúng từ data — không lệ thuộc thứ tự gán schema/data)
+    set data(val) { this._data = val; this._dataKey++; this.renderComponent(); }
 
     // Phương thức public: gọi từ ngoài để submit form (validation + emit onFormSubmit)
     submitForm() {
@@ -542,7 +588,7 @@ class CustomDynamicForm extends HTMLElement {
     renderComponent() {
         if (this._schema && this._uiSchema) {
             try {
-                render(<DynamicFormCore schema={this._schema} uiSchema={this._uiSchema} lang={this.lang} apiRef={this._api} onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))} />, this._container);
+                render(<DynamicFormCore key={this._dataKey} schema={this._schema} uiSchema={this._uiSchema} lang={this.lang} data={this._data} apiRef={this._api} onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))} />, this._container);
             } catch (err) {
                 console.error('[custom-dynamic-form] render error:', err);
                 this._container.innerHTML = '<div style="color:red;padding:16px;font-family:monospace">Render error: ' + (err && err.message ? err.message : err) + '</div>';
