@@ -62,7 +62,7 @@ function warnCoerce(type, value, fieldName) {
     console.warn('[CustomDynamicForm] Ép ' + type + ' thất bại: "' + value + '"' + (fieldName ? ' (field: ' + fieldName + ')' : '') + ' → giữ nguyên, kiểm tra kiểu field');
 }
 
-function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, apiRef, optionsRef, lang, data }) {
+function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, onFieldChange, apiRef, optionsRef, lang, data }) {
     // Khởi tạo từ dữ liệu bản ghi (luồng edit): data chỉ gắn 1 lần khi mở form.
     // Key có trong data (kể cả 0/false) được dùng; key còn lại undefined để effect default lấp nốt.
     const [formData, setFormData] = useState(() => {
@@ -176,6 +176,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, apiRef, op
         setFormData(prev => ({ ...prev, [fieldName]: value }));
         setErrors({});
         setOpenDropdown(null);
+        if (typeof onFieldChange === 'function') onFieldChange({ name: fieldName, value });
     };
 
     // Chiều rộng field: grid (thang 12) trong uiSchema.layout → col-span (lưới 2 cột của HTML): 6→1, 12→2
@@ -417,8 +418,9 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, apiRef, op
         };
 
         if (widgetType === 'radio' && ctx.opts.length) return renderRadioWidget(ctx);
-        if (widgetType === 'custom-select' && ctx.opts.length) return renderCustomSelectWidget(ctx);
-        if (widgetType === 'select' && ctx.opts.length) return renderSelectWidget(ctx);
+        // Select/custom-select luôn render (kể cả chưa có options — hiện "-- Chọn --"); avoid rơi xuống text field
+        if (widgetType === 'custom-select') return renderCustomSelectWidget(ctx);
+        if (widgetType === 'select') return renderSelectWidget(ctx);
         if (widgetType === 'checkbox') return renderCheckboxWidget(ctx);
         if (widgetType === 'time-slider') return renderTimeSliderWidget(ctx);
         return renderTextFieldWidget(ctx);
@@ -531,7 +533,21 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, apiRef, op
     };
 
     // API bên ngoài gọi submit trực tiếp (thay cho nút submit bên trong form)
-    if (apiRef) apiRef.submit = () => handleFormSubmit();
+    if (apiRef) {
+        apiRef.submit = () => handleFormSubmit();
+        // Gán/reset 1 field từ ngoài (vd: reset xã khi đổi tỉnh) — không remount toàn bộ form.
+        apiRef.setValue = (fieldName, value) => {
+            const prop = schema?.properties?.[fieldName];
+            if (prop) value = coerceValue(value, prop, fieldName);
+            setFormData(prev => ({ ...prev, [fieldName]: value }));
+            setErrors(prev => {
+                if (!(fieldName in prev)) return prev;
+                const next = { ...prev };
+                delete next[fieldName];
+                return next;
+            });
+        };
+    }
 
     if (optionsRef) {
         optionsRef.setLists = (byField) => {
@@ -620,9 +636,12 @@ class CustomDynamicForm extends HTMLElement {
     // core mới (state formData khởi tạo đúng từ data — không lệ thuộc thứ tự gán schema/data)
     set data(val) { this._data = val; this._dataKey++; this.renderComponent(); }
 
-    // Phương thức public: gọi từ ngoài để submit form (validation + emit onFormSubmit)
     submitForm() {
         if (typeof this._api.submit === 'function') this._api.submit();
+    }
+
+    setValue(name, value) {
+        if (typeof this._api.setValue === 'function') this._api.setValue(name, value);
     }
 
     setLists(byField) {
@@ -642,6 +661,7 @@ class CustomDynamicForm extends HTMLElement {
                     optionsRef={this._options}
                     onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))}
                     onSubmitError={(errors) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: { ok: false, errors } }))}
+                    onFieldChange={(payload) => this.dispatchEvent(new CustomEvent('onFieldChange', { detail: payload }))}
                 />, this._container);
             } catch (err) {
                 console.error('[custom-dynamic-form] render error:', err);
