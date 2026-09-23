@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node tests/test-schema.mjs",
+    "test": "node tests/test-schema.mjs && node tests/test-sanitize.mjs && node tests/test-conditional.mjs",
     "dev": "vite --mode builder --open",
     "build": "npm run build:engine && npm run build:builder",
     "build:engine": "vite build",

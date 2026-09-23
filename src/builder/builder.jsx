@@ -4,7 +4,7 @@ import Sortable from 'sortablejs';
 import * as SCNS from '../../lib/schema-compile.js';
 // Dev: nạp engine trực tiếp (prod dùng dist/builder/custom-dynamic-form.js qua <script>).
 if (import.meta.env.DEV) { import('../CustomDynamicForm.jsx'); }
-import './builder.css'; 
+import './builder.css';
 
 // schema-compile.js is UMD: vite dev serves it without CJS interop (global gets set on
 // evaluation), while rolldown build wraps it in CJS (default export = the lib object).
@@ -66,13 +66,8 @@ function Builder() {
             return n;
         }
 
-        // Văn bản hiển thị trên canvas theo ngôn ngữ đang nhập (EN fallback về VI).
-        function dispText(f) {
-            return state.editLocale === 'en'
-                ? (f.labelEn != null && f.labelEn !== '' ? f.labelEn : f.label)
-                : f.label;
-        }
-        function dispOptLabel(o) {
+        // Văn bản hiển thị theo ngôn ngữ đang nhập (EN fallback về VI).
+        function dispLabel(o) {
             return state.editLocale === 'en'
                 ? (o.labelEn != null && o.labelEn !== '' ? o.labelEn : o.label)
                 : o.label;
@@ -138,13 +133,6 @@ function Builder() {
             }
             if (f.type === 'checkbox') return val === 'true';
             return val;
-        }
-
-        function shareDefaults(f) {
-            var c = {};
-            if (f.defaultValue !== undefined) c.defaultValue = f.defaultValue;
-            if (f.validate) c.validate = f.validate;
-            return c;
         }
 
         function sanitizeKey(f) {
@@ -286,9 +274,9 @@ function Builder() {
                 if (f.type === 'divider') {
                     lmain.appendChild(el('div', 'layout-divider-visual'));
                 } else if (f.type === 'heading') {
-                    lmain.appendChild(el('div', 'field-label layout-heading-text', dispText(f) || '(chưa có tiêu đề)'));
+                    lmain.appendChild(el('div', 'field-label layout-heading-text', dispLabel(f) || '(chưa có tiêu đề)'));
                 } else {
-                    lmain.appendChild(el('div', 'field-label layout-paragraph-text', dispText(f) || '(trống)'));
+                    lmain.appendChild(el('div', 'field-label layout-paragraph-text', dispLabel(f) || '(trống)'));
                 }
                 var lmeta = el('div', 'field-meta');
                 lmeta.appendChild(el('span', 'badge layout-badge', TYPE_NAMES[f.type] || f.type));
@@ -305,7 +293,7 @@ function Builder() {
             card.setAttribute('data-id', f.id);
             card.appendChild(el('div', 'drag-handle', '\u22ee\u22ee'));
             var main = el('div', 'field-main');
-            main.appendChild(el('div', 'field-label', dispText(f) || f.key || '(chưa có nhãn)'));
+            main.appendChild(el('div', 'field-label', dispLabel(f) || f.key || '(chưa có nhãn)'));
             var meta = el('div', 'field-meta');
             meta.appendChild(el('span', 'badge', TYPE_NAMES[f.type] || f.type));
             meta.appendChild(el('span', 'badge key', f.key || ''));
@@ -321,11 +309,11 @@ function Builder() {
                     if (f.type === 'radio') {
                         var line = el('div', 'opt-line');
                         line.appendChild(el('span', 'opt-line-mark', '\u25c9'));
-                        line.appendChild(el('span', 'opt-line-label', dispOptLabel(o) || o.value || '(trống)'));
+                        line.appendChild(el('span', 'opt-line-label', dispLabel(o) || o.value || '(trống)'));
                         if (o.children && o.children.length) line.appendChild(el('span', 'badge child', 'children ' + o.children.length));
                         optBox.appendChild(line);
                     } else {
-                        optBox.appendChild(el('span', 'badge opt-badge', dispOptLabel(o) || o.value || '(trống)'));
+                        optBox.appendChild(el('span', 'badge opt-badge', dispLabel(o) || o.value || '(trống)'));
                     }
                 });
                 main.appendChild(optBox);
@@ -502,28 +490,18 @@ function Builder() {
         function buildValidationSection(f) {
             var wrap = el('div', 'setting-group');
             wrap.appendChild(el('label', 'setting-label', 'Ràng buộc'));
-            if (f.type === 'number') {
-                wrap.appendChild(settingRow('Giá trị nhỏ nhất', numInput(f.validate.min, 'min')));
-                wrap.appendChild(settingRow('Giá trị lớn nhất', numInput(f.validate.max, 'max')));
-            } else if (f.type === 'date') {
-                wrap.appendChild(inlineRow('Ngày nhỏ nhất', dateInput(f.validate.min, 'date-min'), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
-                wrap.appendChild(inlineRow('Ngày lớn nhất', dateInput(f.validate.max, 'date-max'), 'Chặn chọn ngày ngoài khoảng khi submit'));
-            } else if (f.type === 'time') {
-                wrap.appendChild(settingRow('Thời gian tối thiểu (phút)', numInput(f.validate.min, 'min')));
-                wrap.appendChild(settingRow('Thời gian tối đa (phút)', numInput(f.validate.max, 'max')));
+            var rows = rangeRows(f, null);
+            rows.forEach(function (row) { wrap.appendChild(row); });
+            if (f.type === 'time') {
                 wrap.appendChild(el('p', 'col-hint', 'Đơn vị phút (1h30p = 90). Người điền kéo thanh trượt giới hạn trong khoảng này; payload submit là số giây.'));
-            } else if (f.type === 'text' || f.type === 'textarea') {
-                wrap.appendChild(settingRow('Độ dài tối thiểu', numInput(f.validate.minLength, 'minlen')));
-                wrap.appendChild(settingRow('Độ dài tối đa', numInput(f.validate.maxLength, 'maxlen')));
-                if (f.type === 'text') {
-                    var pRow = settingRow('Pattern (regex)', textInput(f.validate.pattern, 'pattern'));
-                    var pIn = pRow.querySelector('.input');
-                    pIn.placeholder = 'VD: ^[\\p{L}\\s]+$ (chỉ thân regex)';
-                    pIn.title = 'Nhập thân regex, không kèm dấu bao /…/ và cờ. Cờ /u luôn được bật nên \\p{L}, \\uXXXX chạy được.';
-                    wrap.appendChild(pRow);
-                    wrap.appendChild(buildPatternExamples());
-                }
-            } else {
+            } else if (f.type === 'text') {
+                var pRow = settingRow('Pattern (regex)', textInput(f.validate.pattern, 'pattern'));
+                var pIn = pRow.querySelector('.input');
+                pIn.placeholder = 'VD: ^[\\p{L}\\s]+$ (chỉ thân regex)';
+                pIn.title = 'Nhập thân regex, không kèm dấu bao /…/ và cờ. Cờ /u luôn được bật nên \\p{L}, \\uXXXX chạy được.';
+                wrap.appendChild(pRow);
+                wrap.appendChild(buildPatternExamples());
+            } else if (!rows.length) {
                 wrap.appendChild(el('p', 'col-hint', 'Không có ràng buộc cho loại này.'));
             }
             return wrap;
@@ -558,16 +536,7 @@ function buildRadioSection(f) {
 
 function buildDefaultInput(f) {
             if (f.type === 'checkbox') {
-                var s = document.createElement('select');
-                s.className = 'input';
-                s.setAttribute('data-bind', 'defval-boolean');
-                [['', 'Mặc định: không'], ['true', 'Mặc định: có (đã tick)'], ['false', 'Mặc định: không tick']].forEach(function (pair) {
-                    var o = document.createElement('option');
-                    o.value = pair[0]; o.textContent = pair[1];
-                    if (String(f.defaultValue) === pair[0]) o.selected = true;
-                    s.appendChild(o);
-                });
-                return s;
+                return booleanSelect(f.defaultValue, 'defval-boolean', null);
             }
             if (f.type === 'date') {
                 var d = dateInput(f.defaultValue, 'defval');
@@ -589,16 +558,7 @@ function buildDefaultInput(f) {
 
             var descRow = el('div', 'setting-row');
             descRow.appendChild(el('label', 'row-label', state.editLocale === 'en' ? 'Mô tả — EN (hiện phía dưới field)' : 'Mô tả (hiện phía dưới field, có thể để trống)'));
-            var descInput = document.createElement('textarea');
-            descInput.className = 'input';
-            descInput.rows = 2;
-            descInput.value = state.editLocale === 'en' ? (f.descriptionEn || '') : (f.description || '');
-            descInput.setAttribute('data-bind', state.editLocale === 'en' ? 'description-en' : 'description');
-            descInput.spellcheck = false;
-            descInput.placeholder = state.editLocale === 'en'
-                ? (f.description ? 'Đang hiển thị (VI): ' + stripHtml(f.description) : 'Nhập mô tả tiếng Anh…')
-                : 'Nhập mô tả…';
-            descRow.appendChild(descInput);
+            descRow.appendChild(localeTextarea(f.description, f.descriptionEn, 'description', 'description-en', 'Nhập mô tả…', 'Nhập mô tả tiếng Anh…', 2));
             wrap.appendChild(descRow);
 
             var keyRow = el('div', 'setting-row inline');
@@ -610,33 +570,22 @@ function buildDefaultInput(f) {
             keyRow.appendChild(keyInput);
             wrap.appendChild(keyRow);
 
-            var reqGroup = el('div', 'btn-group');
-            [['0', 'Không'], ['1', 'Có']].forEach(function (pair) {
-                var rb = el('button', 'btn-opt' + ((!!f.required) === (pair[0] === '1') ? ' active' : ''), pair[1]);
-                rb.type = 'button';
-                rb.setAttribute('data-role', 'req-toggle');
-                rb.setAttribute('data-req', pair[0]);
-                reqGroup.appendChild(rb);
-            });
-            wrap.appendChild(inlineRow('Bắt buộc', reqGroup, 'Hiển thị dấu hoa thị đỏ (*)'));
+            if (f.type === 'select' || f.type === 'radio') {
+                wrap.appendChild(inlineRow('Dữ liệu từ API', toggleGroup([['0', 'Không'], ['1', 'Có']], function (p) { return (f.apiData === true) === (p[0] === '1'); }, 'apidata-toggle', 'data-apidata'), 'Bật: không nhập danh sách option; options nạp từ API khi render (field key tự động thêm vào optionKeys)'));
+            }
+
+            wrap.appendChild(inlineRow('Bắt buộc', toggleGroup([['0', 'Không'], ['1', 'Có']], function (p) { return (!!f.required) === (p[0] === '1'); }, 'req-toggle', 'data-req'), 'Hiển thị dấu hoa thị đỏ (*)'));
 
             if (!isChildField(f)) {
-                var gridGroup = el('div', 'btn-group');
-                [[6, '50%'], [12, '100%']].forEach(function (pair) {
-                    var gb = el('button', 'btn-opt' + ((f.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
-                    gb.type = 'button';
-                    gb.setAttribute('data-role', 'grid-toggle');
-                    gb.setAttribute('data-grid', String(pair[0]));
-                    gridGroup.appendChild(gb);
-                });
-                wrap.appendChild(inlineRow('Chiều rộng', gridGroup, 'Toàn hàng (100%) hoặc một nửa (50%)'));
+                wrap.appendChild(inlineRow('Chiều rộng', gridToggle(f.grid, null), 'Toàn hàng (100%) hoặc một nửa (50%)'));
             }
             return wrap;
         }
 
         function buildOptionsEditor(f) {
             var wrap = el('div', 'setting-group');
-            wrap.appendChild(el('label', 'setting-label', 'Lựa chọn + field con (children)'));
+            var supportsKids = f.type === 'radio';
+            wrap.appendChild(el('label', 'setting-label', supportsKids ? 'Lựa chọn + field con (children)' : 'Lựa chọn'));
             var list = el('div', 'opt-list');
             (f.options || []).forEach(function (opt, i) {
                 list.appendChild(buildOptionNode(f, opt, i));
@@ -645,7 +594,7 @@ function buildDefaultInput(f) {
             var add = bindButton('+ Thêm lựa chọn', 'add-opt');
             wrap.appendChild(add);
             if ((f.options || []).length === 0) {
-                var hint = el('p', 'col-hint', 'Chưa có lựa chọn nào. Thêm lựa chọn để tạo field con theo option.');
+                var hint = el('p', 'col-hint', supportsKids ? 'Chưa có lựa chọn nào. Thêm lựa chọn để tạo field con theo option.' : 'Chưa có lựa chọn nào. Thêm lựa chọn hiển thị trong dropdown.');
                 wrap.insertBefore(hint, list);
             }
             return wrap;
@@ -670,23 +619,19 @@ function buildDefaultInput(f) {
             dn.title = 'Di chuyển xuống';
             row.appendChild(dn);
             var isEn = state.editLocale === 'en';
-            var lab = textInput(isEn ? opt.labelEn : opt.label, isEn ? 'opt-label-en' : 'opt-label');
-            lab.setAttribute('data-opt', String(i));
-            lab.classList.add('opt-label');
-            lab.placeholder = isEn ? 'Nhãn EN (label)' : 'Nhãn (label)';
-            var val = textInput(opt.value, 'opt-value');
-            val.classList.add('opt-value');
-            val.setAttribute('data-opt', String(i));
-            val.placeholder = 'Giá trị (value)';
-            row.appendChild(lab);
-            row.appendChild(val);
-            var hasKids = !!(opt.children && opt.children.length);
-            var kidsBtn = el('button', 'sub-btn btn-sm', hasKids ? 'Field con (' + opt.children.length + ')' : '+ Field con');
-            kidsBtn.setAttribute('data-role', 'opt-children-toggle');
-            kidsBtn.setAttribute('data-opt', String(i));
-            kidsBtn.type = 'button';
-            kidsBtn.title = hasKids ? 'Thu gọn / mở rộng field con của option này' : 'Thêm field con xuất hiện khi chọn option này';
-            row.appendChild(kidsBtn);
+            var lv = optionLabelValueInputs(opt, i, null, isEn);
+            row.appendChild(lv[0]);
+            row.appendChild(lv[1]);
+            var supportsKids = f.type === 'radio';
+            var hasKids = supportsKids && !!(opt.children && opt.children.length);
+            if (supportsKids) {
+                var kidsBtn = el('button', 'sub-btn btn-sm', hasKids ? 'Field con (' + opt.children.length + ')' : '+ Field con');
+                kidsBtn.setAttribute('data-role', 'opt-children-toggle');
+                kidsBtn.setAttribute('data-opt', String(i));
+                kidsBtn.type = 'button';
+                kidsBtn.title = hasKids ? 'Thu gọn / mở rộng field con của option này' : 'Thêm field con xuất hiện khi chọn option này';
+                row.appendChild(kidsBtn);
+            }
             var del = el('button', 'ibtn del', '\u2715');
             del.setAttribute('data-role', 'del-opt');
             del.setAttribute('data-opt', String(i));
@@ -707,10 +652,10 @@ function buildDefaultInput(f) {
 
             item.appendChild(row);
 
-            if (opt.children) {
+            if (supportsKids && opt.children) {
                 var cwrap = el('div', 'opt-children');
                 var ct = el('div', 'opt-children-title');
-                ct.appendChild(el('span', null, 'Field con xuất hiện khi chọn "' + (dispOptLabel(opt) || opt.value || '?') + '"'));
+                ct.appendChild(el('span', null, 'Field con xuất hiện khi chọn "' + (dispLabel(opt) || opt.value || '?') + '"'));
                 ct.appendChild(el('span', 'hint', '(bắt buộc khi hiển thị)'));
                 cwrap.appendChild(ct);
                 opt.children.forEach(function (c, ci) {
@@ -770,29 +715,10 @@ function buildDefaultInput(f) {
             keyRow.appendChild(keyIn);
             wrap.appendChild(keyRow);
 
-            var cgridGroup = el('div', 'btn-group');
-            [[6, '50%'], [12, '100%']].forEach(function (pair) {
-                var gb = el('button', 'btn-opt' + ((c.grid || 12) === pair[0] ? ' active' : ''), pair[1]);
-                gb.type = 'button';
-                gb.setAttribute('data-role', 'grid-toggle');
-                gb.setAttribute('data-grid', String(pair[0]));
-                gb.setAttribute('data-child', c.id);
-                cgridGroup.appendChild(gb);
-            });
-            wrap.appendChild(inlineRow('Chiều rộng', cgridGroup, 'Toàn hàng (100%) hoặc một nửa (50%)'));
+            wrap.appendChild(inlineRow('Chiều rộng', gridToggle(c.grid, c.id), 'Toàn hàng (100%) hoặc một nửa (50%)'));
 
             if (c.type === 'checkbox') {
-                var s = document.createElement('select');
-                s.className = 'input';
-                s.setAttribute('data-bind', 'child-defval-boolean');
-                s.setAttribute('data-child', c.id);
-                [['', 'Mặc định: không'], ['true', 'Mặc định: có'], ['false', 'Mặc định: không tick']].forEach(function (p) {
-                    var o = document.createElement('option');
-                    o.value = p[0]; o.textContent = p[1];
-                    if (String(c.defaultValue) === p[0]) o.selected = true;
-                    s.appendChild(o);
-                });
-                wrap.appendChild(settingRow('Mặc định', s));
+                wrap.appendChild(settingRow('Mặc định', booleanSelect(c.defaultValue, 'child-defval-boolean', c.id, [['', 'Mặc định: không'], ['true', 'Mặc định: có'], ['false', 'Mặc định: không tick']])));
             } else if (c.type === 'select') {
                 var ol = el('div', 'opt-list');
                 (c.options || []).forEach(function (o, idx) {
@@ -808,22 +734,13 @@ function buildDefaultInput(f) {
                     ock.checked = (c.defaultValue !== undefined && c.defaultValue !== null && String(c.defaultValue) === String(o.value));
                     ro.appendChild(ock);
                     var isEn = state.editLocale === 'en';
-                    var olb = textInput(isEn ? o.labelEn : o.label, isEn ? 'copt-label-en' : 'copt-label');
-                    olb.setAttribute('data-child', c.id);
-                    olb.setAttribute('data-copt', String(idx));
-                    olb.classList.add('opt-label');
-                    olb.placeholder = isEn ? 'Nhãn EN (label)' : 'Nhãn (label)';
-                    var ov = textInput(o.value, 'copt-value');
-                    ov.setAttribute('data-child', c.id);
-                    ov.setAttribute('data-copt', String(idx));
-                    ov.classList.add('opt-value');
-                    ov.placeholder = 'Giá trị (value)';
+                    var lv = optionLabelValueInputs(o, idx, c.id, isEn);
                     var od = el('button', 'ibtn del', '\u2715');
                     od.setAttribute('data-role', 'del-copt');
                     od.setAttribute('data-child', c.id);
                     od.setAttribute('data-copt', String(idx));
                     od.type = 'button';
-                    ro.appendChild(olb); ro.appendChild(ov); ro.appendChild(od);
+                    ro.appendChild(lv[0]); ro.appendChild(lv[1]); ro.appendChild(od);
                     orow.appendChild(ro);
                     ol.appendChild(orow);
                 });
@@ -839,25 +756,105 @@ function buildDefaultInput(f) {
                 wrap.appendChild(settingRow(('number' === c.type || 'time' === c.type) ? 'Mặc định (số)' : 'Mặc định', defVal));
             }
 
-            if (c.type === 'number') {
-                wrap.appendChild(settingRow('Giá trị nhỏ nhất', withChild(numInput(c.validate.min, 'child-min'), c.id)));
-                wrap.appendChild(settingRow('Giá trị lớn nhất', withChild(numInput(c.validate.max, 'child-max'), c.id)));
-            } else if (c.type === 'time') {
-                wrap.appendChild(settingRow('Thời gian tối thiểu (phút)', withChild(numInput(c.validate.min, 'child-min'), c.id)));
-                wrap.appendChild(settingRow('Thời gian tối đa (phút)', withChild(numInput(c.validate.max, 'child-max'), c.id)));
-            } else if (c.type === 'date') {
-                wrap.appendChild(inlineRow('Ngày nhỏ nhất', withChild(dateInput(c.validate.min, 'child-date-min'), c.id), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
-                wrap.appendChild(inlineRow('Ngày lớn nhất', withChild(dateInput(c.validate.max, 'child-date-max'), c.id), 'Chặn chọn ngày ngoài khoảng khi submit'));
-            } else if (c.type === 'text' || c.type === 'textarea') {
-                wrap.appendChild(settingRow('Độ dài tối thiểu', withChild(numInput(c.validate.minLength, 'child-minlen'), c.id)));
-                wrap.appendChild(settingRow('Độ dài tối đa', withChild(numInput(c.validate.maxLength, 'child-maxlen'), c.id)));
-            }
+            rangeRows(c, c.id).forEach(function (row) { wrap.appendChild(row); });
             return wrap;
         }
 
         function withChild(inputNode, attr) {
             inputNode.setAttribute('data-child', attr);
             return inputNode;
+        }
+
+        function toggleGroup(pairs, isActive, role, dataAttr) {
+            var g = el('div', 'btn-group');
+            pairs.forEach(function (pair) {
+                var b = el('button', 'btn-opt' + (isActive(pair) ? ' active' : ''), pair[1]);
+                b.type = 'button';
+                b.setAttribute('data-role', role);
+                b.setAttribute(dataAttr, pair[0]);
+                g.appendChild(b);
+            });
+            return g;
+        }
+
+        function gridToggle(value, childId) {
+            var g = el('div', 'btn-group');
+            [[6, '50%'], [12, '100%']].forEach(function (pair) {
+                var b = el('button', 'btn-opt' + ((value || 12) === pair[0] ? ' active' : ''), pair[1]);
+                b.type = 'button';
+                b.setAttribute('data-role', 'grid-toggle');
+                b.setAttribute('data-grid', String(pair[0]));
+                if (childId) b.setAttribute('data-child', childId);
+                g.appendChild(b);
+            });
+            return g;
+        }
+
+        function booleanSelect(value, bind, childId, labels) {
+            var s = document.createElement('select');
+            s.className = 'input';
+            s.setAttribute('data-bind', bind);
+            if (childId) s.setAttribute('data-child', childId);
+            (labels || [['', 'Mặc định: không'], ['true', 'Mặc định: có (đã tick)'], ['false', 'Mặc định: không tick']]).forEach(function (pair) {
+                var o = document.createElement('option');
+                o.value = pair[0]; o.textContent = pair[1];
+                if (String(value) === pair[0]) o.selected = true;
+                s.appendChild(o);
+            });
+            return s;
+        }
+
+        // Dòng min/max theo loại field; dùng chung cho field top-level và field con
+        // (con: bind thêm tiền tố child-, gắn data-child).
+        function rangeRows(f, childId) {
+            var a = childId ? function (n) { return withChild(n, childId); } : function (n) { return n; };
+            var bind = childId ? function (s) { return 'child-' + s; } : function (s) { return s; };
+            var rows = [];
+            if (f.type === 'number') {
+                rows.push(settingRow('Giá trị nhỏ nhất', a(numInput(f.validate.min, bind('min')))));
+                rows.push(settingRow('Giá trị lớn nhất', a(numInput(f.validate.max, bind('max')))));
+            } else if (f.type === 'date') {
+                rows.push(inlineRow('Ngày nhỏ nhất', a(dateInput(f.validate.min, bind('date-min'))), 'Định dạng YYYY-MM-DD, để trống nếu không giới hạn'));
+                rows.push(inlineRow('Ngày lớn nhất', a(dateInput(f.validate.max, bind('date-max'))), 'Chặn chọn ngày ngoài khoảng khi submit'));
+            } else if (f.type === 'time') {
+                rows.push(settingRow('Thời gian tối thiểu (phút)', a(numInput(f.validate.min, bind('min')))));
+                rows.push(settingRow('Thời gian tối đa (phút)', a(numInput(f.validate.max, bind('max')))));
+            } else if (f.type === 'text' || f.type === 'textarea') {
+                rows.push(settingRow('Độ dài tối thiểu', a(numInput(f.validate.minLength, bind('minlen')))));
+                rows.push(settingRow('Độ dài tối đa', a(numInput(f.validate.maxLength, bind('maxlen')))));
+            }
+            return rows;
+        }
+
+        // 2 input label + value của 1 option. childId != null: gắn thêm data-child + dùng bind copt-*.
+        function optionLabelValueInputs(o, idx, childId, isEn) {
+            var scope = childId
+                ? function (n) { n.setAttribute('data-child', childId); n.setAttribute('data-copt', String(idx)); return n; }
+                : function (n) { n.setAttribute('data-opt', String(idx)); return n; };
+            var prefix = childId ? 'copt' : 'opt';
+            var lab = scope(textInput(isEn ? o.labelEn : o.label, prefix + '-label' + (isEn ? '-en' : '')));
+            lab.classList.add('opt-label');
+            lab.placeholder = isEn ? 'Nhãn EN (label)' : 'Nhãn (label)';
+            var val = scope(textInput(o.value, prefix + '-value'));
+            val.classList.add('opt-value');
+            val.placeholder = 'Giá trị (value)';
+            return [lab, val];
+        }
+
+        // Textarea song ngữ: hiển thị theo state.editLocale, bind theo locale, placeholder EN có fallback bản VI.
+        function localeTextarea(value, valueEn, bindVn, bindEn, phVn, phEn, rows) {
+            var isEn = state.editLocale === 'en';
+            var ta = document.createElement('textarea');
+            ta.style.width = '100%';
+            ta.className = 'input';
+            ta.rows = rows || 10;
+            ta.value = isEn ? (valueEn || '') : (value || '');
+            ta.setAttribute('data-bind', isEn ? bindEn : bindVn);
+            ta.spellcheck = false;
+            ta.placeholder = isEn
+                ? (value != null && value !== '' ? 'Đang hiển thị (VI): ' + stripHtml(value) : phEn)
+                : phVn;
+            return ta;
         }
 
         function renderSettings() {
@@ -877,93 +874,84 @@ function buildDefaultInput(f) {
             return foot;
         }
 
-        function renderSettingsBody() {
-            state.confirmDel = false;
-            settingsEl.innerHTML = '';
-            var f = findFieldById(state.selectedId);
-            if (!f) {
-                settingsEl.innerHTML = '';
-                return;
-            }
+        function setSettingsTitle(f) {
             var titleText = (f.label || '') + ' — ' + (TYPE_NAMES[f.type] || f.type);
             var titleEl = $('settings-title');
             titleEl.textContent = titleText.length > 50 ? titleText.slice(0, 50) + '…' : titleText;
             titleEl.title = titleText;
-            var box = el('div');
+        }
+
+        function buildTypeBanner(f) {
             var banner = el('div', 'field-type-banner');
             banner.appendChild(el('span', null, TYPE_NAMES[f.type] || f.type));
             if (isChildField(f)) {
                 var po = parentOptionOf(f);
                 banner.appendChild(el('span', 'badge child', 'field con · "' + ((po && (po.label || po.value)) || '?') + '"'));
             }
-            box.appendChild(banner);
+            return banner;
+        }
 
-            if (f.type === 'divider' || f.type === 'paragraph' || f.type === 'heading') {
-                var isEn = state.editLocale === 'en';
-                if (f.type === 'heading') {
-                    var hgroup = el('div', 'setting-group');
-                    hgroup.appendChild(el('label', 'setting-label', isEn ? 'Heading (tiếng Anh)' : 'Tiêu đề'));
-                    var hta = document.createElement('textarea');
-                    hta.style.width = '100%';
-                    hta.className = 'input';
-                    hta.rows = 10;
-                    hta.value = isEn ? (f.labelEn || '') : (f.label || '');
-                    hta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
-                    hta.spellcheck = false;
-                    hta.placeholder = isEn
-                        ? (f.label ? 'Đang hiển thị (VI): ' + stripHtml(f.label) : 'Nhập nội dung tiếng Anh…')
-                        : 'Nhập tiêu đề hiển thị trong form…';
-                    hgroup.appendChild(hta);
-                    var hnote = document.createElement('p');
-                    hnote.className = 'html-note';
-                    hnote.innerHTML = 'Hiển thị dạng tiêu đề (H3). Chỉ văn bản thuần, không hỗ trợ thẻ HTML.';
-                    hgroup.appendChild(hnote);
-                    box.appendChild(hgroup);
-                    var fsGroup = el('div', 'setting-group');
-                    fsGroup.appendChild(el('label', 'setting-label', 'Cỡ chữ'));
-                    var fsBtns = el('div', 'btn-group');
-                    [['large', 'Large (hiện tại)'], ['normal', 'Normal (như nhãn input)']].forEach(function (pair) {
-                        var fb = el('button', 'btn-opt' + (((f.fontSize || 'large') === pair[0]) ? ' active' : ''), pair[1]);
-                        fb.setAttribute('data-role', 'heading-font-toggle');
-                        fb.setAttribute('data-fs', pair[0]);
-                        fb.type = 'button';
-                        fsBtns.appendChild(fb);
-                    });
-                    fsGroup.appendChild(fsBtns);
-                    box.appendChild(fsGroup);
-                } else if (f.type === 'paragraph') {
-                    var pgroup = el('div', 'setting-group');
-                    pgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
-                    var pta = document.createElement('textarea');
-                    pta.style.width = '100%';
-                    pta.className = 'input';
-                    pta.rows = 10;
-                    pta.value = isEn ? (f.labelEn || '') : (f.label || '');
-                    pta.setAttribute('data-bind', isEn ? 'paragraph-text-en' : 'paragraph-text');
-                    pta.spellcheck = false;
-                    pta.placeholder = isEn
-                        ? (f.label ? 'Đang hiển thị (VI): ' + stripHtml(f.label) : 'Nhập nội dung tiếng Anh…')
-                        : 'Nhập đoạn văn hiển thị trong form…';
-                    pgroup.appendChild(pta);
-                    pgroup.appendChild(quickLinkButton(pta));
-                    var pnote = document.createElement('p');
-                    pnote.className = 'html-note';
-                    pnote.innerHTML = 'Hỗ trợ thẻ <code>&lt;a href="https://…"&gt;…&lt;/a&gt;</code> để chèn liên kết. Các thẻ khác (div, b, span, script…) và thuộc tính style/class/on* sẽ bị bỏ khi hiển thị.';
-                    pgroup.appendChild(pnote);
-                    box.appendChild(pgroup);
-                } else {
-                    box.appendChild(el('p', 'col-hint', 'Kẻ đường phân cách toàn chiều rộng form. Không cần cấu hình thêm.'));
-                }
-                box.appendChild(buildSettingsFooter());
-                settingsEl.appendChild(box);
-                return;
+        function buildLayoutSection(f) {
+            var isEn = state.editLocale === 'en';
+            if (f.type === 'heading') {
+                var hgroup = el('div', 'setting-group');
+                hgroup.appendChild(el('label', 'setting-label', isEn ? 'Heading (tiếng Anh)' : 'Tiêu đề'));
+                hgroup.appendChild(localeTextarea(f.label, f.labelEn, 'paragraph-text', 'paragraph-text-en', 'Nhập tiêu đề hiển thị trong form…', 'Nhập nội dung tiếng Anh…', 10));
+                var hnote = document.createElement('p');
+                hnote.className = 'html-note';
+                hnote.innerHTML = 'Hiển thị dạng tiêu đề (H3). Chỉ văn bản thuần, không hỗ trợ thẻ HTML.';
+                hgroup.appendChild(hnote);
+                var fsGroup = el('div', 'setting-group');
+                fsGroup.appendChild(el('label', 'setting-label', 'Cỡ chữ'));
+                var fsBtns = el('div', 'btn-group');
+                [['large', 'Large (hiện tại)'], ['normal', 'Normal (như nhãn input)']].forEach(function (pair) {
+                    var fb = el('button', 'btn-opt' + (((f.fontSize || 'large') === pair[0]) ? ' active' : ''), pair[1]);
+                    fb.setAttribute('data-role', 'heading-font-toggle');
+                    fb.setAttribute('data-fs', pair[0]);
+                    fb.type = 'button';
+                    fsBtns.appendChild(fb);
+                });
+                fsGroup.appendChild(fsBtns);
+                return [hgroup, fsGroup];
             }
+            if (f.type === 'paragraph') {
+                var pgroup = el('div', 'setting-group');
+                pgroup.appendChild(el('label', 'setting-label', isEn ? 'Nội dung — EN (tiếng Anh)' : 'Nội dung'));
+                var pta = localeTextarea(f.label, f.labelEn, 'paragraph-text', 'paragraph-text-en', 'Nhập đoạn văn hiển thị trong form…', 'Nhập nội dung tiếng Anh…', 10);
+                pgroup.appendChild(pta);
+                pgroup.appendChild(quickLinkButton(pta));
+                var pnote = document.createElement('p');
+                pnote.className = 'html-note';
+                pnote.innerHTML = 'Hỗ trợ thẻ <code>&lt;a href="https://…"&gt;…&lt;/a&gt;</code> để chèn liên kết. Các thẻ khác (div, b, span, script…) và thuộc tính style/class/on* sẽ bị bỏ khi hiển thị.';
+                pgroup.appendChild(pnote);
+                return [pgroup];
+            }
+            return [el('p', 'col-hint', 'Kẻ đường phân cách toàn chiều rộng form. Không cần cấu hình thêm.')];
+        }
 
-            box.appendChild(buildCommonSection(f));
-            if (f.type !== 'select' && f.type !== 'radio') box.appendChild(settingRow('Giá trị mặc định', buildDefaultInput(f)));
-            if (f.type === 'select' || f.type === 'radio') box.appendChild(buildOptionsEditor(f));
-            if (f.type === 'radio') box.appendChild(buildRadioSection(f));
-            box.appendChild(buildValidationSection(f));
+        function buildApiHint() {
+            return el('p', 'col-hint', 'Danh sách lấy từ API khi render — không nhập lựa chọn tĩnh.');
+        }
+
+        function renderSettingsBody() {
+            state.confirmDel = false;
+            settingsEl.innerHTML = '';
+            var f = findFieldById(state.selectedId);
+            if (!f) return;
+            setSettingsTitle(f);
+            var box = el('div');
+            box.appendChild(buildTypeBanner(f));
+            if (f.type === 'divider' || f.type === 'paragraph' || f.type === 'heading') {
+                buildLayoutSection(f).forEach(function (g) { box.appendChild(g); });
+            } else {
+                box.appendChild(buildCommonSection(f));
+                if (f.type !== 'select' && f.type !== 'radio') box.appendChild(settingRow('Giá trị mặc định', buildDefaultInput(f)));
+                if (f.type === 'select' || f.type === 'radio') {
+                    box.appendChild(f.apiData === true ? buildApiHint() : buildOptionsEditor(f));
+                }
+                if (f.type === 'radio') box.appendChild(buildRadioSection(f));
+                box.appendChild(buildValidationSection(f));
+            }
             box.appendChild(buildSettingsFooter());
             settingsEl.appendChild(box);
         }
@@ -1334,6 +1322,15 @@ function buildDefaultInput(f) {
                 return;
             }
 
+            if (role === 'apidata-toggle') {
+                f.apiData = t.getAttribute('data-apidata') === '1';
+                touchCard(f);
+                renderSettings();
+                renderJSON();
+                schedulePreview();
+                return;
+            }
+
             if (role === 'add-opt') {
                 ensureOptions(f);
                 f.options.push({ value: '', label: '', children: null });
@@ -1359,6 +1356,7 @@ function buildDefaultInput(f) {
                 return;
             }
             if (role === 'opt-children-toggle') {
+                if (f.type !== 'radio') return;
                 var oo = Number(t.getAttribute('data-opt'));
                 var opt = f.options[oo];
                 if (!opt) return;
@@ -1369,6 +1367,7 @@ function buildDefaultInput(f) {
                 return;
             }
             if (role === 'add-child') {
+                if (f.type !== 'radio') return;
                 var oa = Number(t.getAttribute('data-opt'));
                 var opta = f.options[oa];
                 if (!opta) return;
@@ -1775,8 +1774,6 @@ function buildDefaultInput(f) {
                             <button type="button" className="btn btn-sm" data-act="save">Lưu</button>
                             <button type="button" className="btn btn-sm" data-act="new">Mới</button>
                             <button type="button" className="btn btn-sm" data-act="import">Import</button>
-                            <button type="button" className="btn btn-sm" data-act="export">Tải JSON</button>
-                            <button type="button" className="btn btn-sm" data-act="copy">Copy</button>
                             <button type="button" className="btn btn-sm btn-danger" data-act="delete" title="Xóa form đã lưu">Xóa</button>
                         </div>
                     </div>
@@ -1790,7 +1787,7 @@ function buildDefaultInput(f) {
                         <button type="button" className="tab" data-tab="json">JSON xuất</button>
                         <button type="button" className="tab" data-tab="test">Test Edit</button>
                     </div>
- 
+
                      <div className="panel active" id="panel-preview">
                         <div className="preview-bar">
                             <span className="locale-group" title="Ngôn ngữ hiển thị form (chọn theo locales trong title)">

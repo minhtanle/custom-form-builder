@@ -461,10 +461,10 @@ body {
 .setting-row .row-label .hint { color: var(--muted); font-weight: 400; display: block; font-size: 11px; margin-top: 2px; }
 .setting-row .input, .setting-row select, .setting-row textarea { width: 100%; }
 .setting-row.inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.setting-row.inline .row-label { margin-bottom: 0; flex: none; line-height: 1.3; white-space: normal; }
-.setting-row.inline .row-label .hint { display: block; font-size: 11px; font-weight: 400; white-space: nowrap; }
-.setting-row.inline .btn-group { flex: 1; max-width: 50%; margin-left: auto; }
-.setting-row.inline .input { flex: 0 0 50%; max-width: 50%; margin-left: auto; }
+.setting-row.inline .row-label { margin-bottom: 0; flex: none; line-height: 1.3; white-space: normal; max-width: 55%; }
+.setting-row.inline .row-label .hint { display: block; font-size: 11px; font-weight: 400; white-space: normal; overflow-wrap: break-word; }
+.setting-row.inline .btn-group { flex: 1; max-width: 40%; margin-left: auto; }
+.setting-row.inline .input { flex: 0 0 50%; max-width: 40%; margin-left: auto; }
 
 .settings-footer {
     display: flex;

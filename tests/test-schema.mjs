@@ -40,7 +40,7 @@ const config = {
         mk('select', 'don_vi', 'Đơn vị giới thiệu', {
             required: true,
             options: [
-                { value: 'trụ sở', label: 'Trụ sở', children: [mk('text', 'phong_ban', 'Phòng ban'), mk('number', 'so_nv', 'Số nhân viên', { required: true })] },
+                { value: 'trụ sở', label: 'Trụ sở', children: [] },
                 { value: 'cn', label: 'Chi nhánh', children: [] }
             ]
         }),
@@ -54,7 +54,7 @@ const config = {
     ]
 };
 
-const { schema, uiSchema } = SC.compile(config);
+const { schema, uiSchema, optionKeys } = SC.compile(config);
 
 assert.strictEqual(schema.type, 'object');
 assert.strictEqual(schema['$schema'], 'http://json-schema.org/draft-07/schema#', 'compiled schema declares draft-07');
@@ -63,15 +63,12 @@ assert.strictEqual(schema.properties.relation.oneOf.length, 3);
 assert.strictEqual(schema.properties.relation.default, 1, 'radio defaults coerced to number when numeric');
 assert.ok(schema.properties.relation.oneOf.every(o => typeof o.const === 'number'), 'numeric radio -> integer consts');
 
-assert.deepStrictEqual(schema.allOf.filter(r => r.if.properties.relation).map(r => r.if.properties.relation.const), [1]);
-assert.deepStrictEqual(schema.allOf.filter(r => r.if.properties.relation)[0].then.required, ['ma_nhan_vien']);
-
-assert.deepStrictEqual(schema.allOf.filter(r => r.if.properties.don_vi && r.if.properties.don_vi.const === 'trụ sở')[0].then.required, ['phong_ban', 'so_nv']);
-assert.strictEqual(schema.allOf.length, 2, 'only option-with-children produces allOf rule');
+assert.deepStrictEqual(schema.allOf.map(r => r.if.properties.relation.const), [1], 'dropdown (select) không tạo rule allOf');
+assert.deepStrictEqual(schema.allOf[0].then.required, ['ma_nhan_vien']);
+assert.strictEqual(schema.allOf.length, 1, 'chỉ radio option có children mới tạo allOf');
 
 assert.ok(Array.isArray(schema.required));
 assert.deepStrictEqual([...schema.required].sort(), ['relation', 'don_vi', 'ho_ten', 'email'].sort(), 'children not in top-level required');
-assert.ok(!schema.required.includes('phong_ban'), 'child not in required');
 assert.ok(!schema.required.includes('ma_nhan_vien'), 'radio child not required');
 
 assert.deepStrictEqual(schema.properties.don_vi.oneOf.map(o => o.const), ['trụ sở', 'cn'], 'select options compiled to oneOf consts');
@@ -92,7 +89,7 @@ assert.ok(!('token' in uiSchema.fields), 'hidden omitted from uiSchema.fields');
 assert.ok(uiSchema.layout.every(r => r.fields.every(f => f.name !== 'token')), 'hidden omitted from layout');
 
 const layoutNames = uiSchema.layout.flatMap(r => r.fields.map(f => f.name));
-assert.deepStrictEqual(layoutNames, ['relation', 'don_vi', 'phong_ban', 'so_nv', 'ho_ten', 'nam_sinh', 'email', 'ghi_chu', 'ngay_dk', 'dong_y'], 'select children follow parent in layout, radio children not in layout');
+assert.deepStrictEqual(layoutNames, ['relation', 'don_vi', 'ho_ten', 'nam_sinh', 'email', 'ghi_chu', 'ngay_dk', 'dong_y'], 'radio children not in layout');
 const rowWithTwo = uiSchema.layout.find(r => r.fields.length === 2);
 assert.deepStrictEqual(rowWithTwo.fields.map(f => f.name).sort(), ['ho_ten', 'nam_sinh']);
 assert.strictEqual(uiSchema.idPrefix, 'dkm');
@@ -102,7 +99,7 @@ assert.strictEqual(uiSchema.fields.relation['ui:widget'], 'radio');
 assert.strictEqual(uiSchema.fields.dong_y['ui:widget'], 'checkbox');
 assert.strictEqual(uiSchema.fields.ho_ten['ui:widget'], 'text');
 
-const round1 = { schema, uiSchema };
+const round1 = { schema, uiSchema, optionKeys };
 const cfgBack = SC.importConfig({ schema, uiSchema });
 const round2 = SC.compile(cfgBack);
 assert.deepStrictEqual(round2, round1, 'compile -> import -> compile is stable');
@@ -176,7 +173,7 @@ assert.strictEqual(rel.options[0].children.length, 1);
 assert.strictEqual(rel.options[0].children[0].key, 'ma_nhan_vien');
 assert.strictEqual(rel.required, true);
 const donVi = cfgBack.fields.find(f => f.key === 'don_vi');
-assert.strictEqual(donVi.options[0].children.length, 2);
+assert.strictEqual(donVi.options[0].children.length, 0, 'dropdown option không có children');
 assert.strictEqual(donVi.options[0].label, 'Trụ sở', 'select label re-imported from oneOf title');
 assert.strictEqual(donVi.options[1].label, 'Chi nhánh');
 
@@ -220,6 +217,39 @@ assert.strictEqual(childInp.grid, 6, 'import preserves radio child grid 6');
 assert.strictEqual(childSel.grid, 6, 'import preserves select child grid 6');
 const gridRound = SC.compile(gridBack);
 assert.deepStrictEqual(gridRound, gridCfg, 'child grid round-trip is stable');
+
+// Dropdown (select) KHÔNG hỗ trợ children: compile bỏ children, import không hồi sinh
+const selKids = {
+    fields: [mk('select', 'kv', 'Khu vực', { options: [{ value: 'a', label: 'A', children: [mk('text', 'inp_a', 'Input A')] }] })]
+};
+const selKidsCompiled = SC.compile(selKids);
+assert.ok(!('inp_a' in selKidsCompiled.schema.properties), 'select children dropped from properties');
+assert.deepStrictEqual(selKidsCompiled.schema.allOf || [], [], 'select children không sinh allOf');
+assert.ok(selKidsCompiled.uiSchema.layout.every(r => r.fields.every(f => f.name !== 'inp_a')), 'select children không vào layout');
+const selKidsBack = SC.importConfig({ schema: selKidsCompiled.schema, uiSchema: selKidsCompiled.uiSchema });
+const kvField = selKidsBack.fields.find(f => f.key === 'kv');
+assert.strictEqual(kvField.type, 'select');
+assert.strictEqual(kvField.options[0].children.length, 0, 'import không hồi sinh children cho dropdown');
+
+// Import JSON cũ có allOf cho dropdown: bỏ children, không lọt thành field thường
+const selKidsJson = SC.importConfig({
+    schema: {
+        type: 'object',
+        properties: {
+            kv: { type: 'string', title: { vi: 'Khu vực' }, oneOf: [{ const: 'a', title: { vi: 'A' } }] },
+            inp_a: { type: 'string', title: { vi: 'Input A' } }
+        },
+        allOf: [{ if: { properties: { kv: { const: 'a' } } }, then: { required: ['inp_a'] } }]
+    },
+    uiSchema: {
+        fields: { kv: { 'ui:widget': 'custom-select' }, inp_a: { 'ui:widget': 'text' } },
+        layout: [{ type: 'row', fields: [{ name: 'kv', grid: 12 }] }, { type: 'row', fields: [{ name: 'inp_a', grid: 12 }] }]
+    }
+});
+const kvImported = selKidsJson.fields.find(f => f.key === 'kv');
+assert.strictEqual(kvImported.type, 'select');
+assert.strictEqual(kvImported.options[0].children.length, 0, 'import dropdown không lấy children từ allOf cũ');
+assert.ok(!selKidsJson.fields.some(f => f.key === 'inp_a'), 'field con của dropdown không thành field thường');
 
 const empty = SC.compile({ name: '', fields: [] });
 assert.deepStrictEqual(empty.schema.properties, {});
@@ -349,6 +379,36 @@ assert.deepStrictEqual(SC.compile(SC.importConfig(timeCfg)), timeCfg, 'time roun
 const timePlain = SC.compile({ name: '', fields: [mk('time', 'finish2', 'Thời gian 2')] });
 assert.ok(!('minimum' in timePlain.schema.properties.finish2), 'time không cấu hình min → không phát minimum');
 assert.deepStrictEqual(SC.compile(SC.importConfig(timePlain)), timePlain, 'time plain round-trip ổn định');
+
+// --- Dữ liệu từ API (apiData): field dropdown không emit oneOf; key vào optionKeys ---
+const apiCfg = SC.compile({ name: '', fields: [
+    mk('select', 'don_vi_api', 'Đơn vị', { required: true, apiData: true }),
+    mk('select', 'loai_tinh', 'Loại', { apiData: false, options: [{ value: 'a', label: 'A' }] }),
+    mk('radio', 'trang_thai', 'Trạng thái', { apiData: true })
+] });
+assert.ok(!('oneOf' in apiCfg.schema.properties.don_vi_api), 'select apiData → KHÔNG emit oneOf');
+assert.ok(!('enum' in apiCfg.schema.properties.don_vi_api), 'select apiData → không emit enum');
+assert.strictEqual(apiCfg.schema.properties.don_vi_api.type, 'string', 'select apiData vẫn type string');
+assert.ok(!('default' in apiCfg.schema.properties.don_vi_api), 'select apiData không đặt default từ options');
+assert.strictEqual(apiCfg.uiSchema.fields.don_vi_api['ui:widget'], 'custom-select', 'select apiData vẫn emit widget custom-select');
+assert.ok(!('oneOf' in apiCfg.schema.properties.trang_thai), 'radio apiData → KHÔNG emit oneOf');
+assert.deepStrictEqual(apiCfg.optionKeys, ['don_vi_api', 'trang_thai'], 'optionKeys = chỉ danh sách field apiData');
+const apiBack = SC.importConfig(apiCfg);
+const apiSel = apiBack.fields.find(f => f.key === 'don_vi_api');
+assert.strictEqual(apiSel.type, 'select', 'import khôi phục type select (từ widget custom-select)');
+assert.strictEqual(apiSel.apiData, true, 'import khôi phục apiData từ doc.optionKeys');
+assert.ok(!Array.isArray(apiSel.options) || apiSel.options.length === 0, 'import field apiData không có options tĩnh');
+const apiRadio = apiBack.fields.find(f => f.key === 'trang_thai');
+assert.strictEqual(apiRadio.type, 'radio', 'import khôi phục type radio (từ widget radio)');
+assert.strictEqual(apiRadio.apiData, true, 'import khôi phục apiData radio');
+const apiStatic = apiBack.fields.find(f => f.key === 'loai_tinh');
+assert.strictEqual(apiStatic.apiData, undefined, 'field apiData false → không có cờ apiData sau import');
+assert.deepStrictEqual(SC.compile(apiBack).optionKeys, apiCfg.optionKeys, 'optionKeys round-trip ổn định');
+assert.deepStrictEqual(SC.compile(apiBack).schema, apiCfg.schema, 'schema apiData round-trip ổn định');
+assert.deepStrictEqual(SC.compile(apiBack).uiSchema, apiCfg.uiSchema, 'uiSchema apiData round-trip ổn định');
+
+const apiNoKeys = SC.compile({ name: '', fields: [mk('text', 'chi_thuong', 'Thường')] });
+assert.deepStrictEqual(apiNoKeys.optionKeys, [], 'không có field apiData → optionKeys = []');
 
 console.log('ALL SCHEMA-COMPILE TESTS PASSED');
 console.log('sample schema:', JSON.stringify(schema, null, 2));
