@@ -62,7 +62,7 @@ function warnCoerce(type, value, fieldName) {
     console.warn('[CustomDynamicForm] Ép ' + type + ' thất bại: "' + value + '"' + (fieldName ? ' (field: ' + fieldName + ')' : '') + ' → giữ nguyên, kiểm tra kiểu field');
 }
 
-function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, optionsRef, lang, data }) {
+function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, apiRef, optionsRef, lang, data }) {
     // Khởi tạo từ dữ liệu bản ghi (luồng edit): data chỉ gắn 1 lần khi mở form.
     // Key có trong data (kể cả 0/false) được dùng; key còn lại undefined để effect default lấp nốt.
     const [formData, setFormData] = useState(() => {
@@ -526,6 +526,7 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, apiRef, optionsRef, lang,
             onSubmit(payload);
         } else {
             setErrors(fieldErrors);
+            if (typeof onSubmitError === 'function') onSubmitError(fieldErrors);
         }
     };
 
@@ -640,6 +641,7 @@ class CustomDynamicForm extends HTMLElement {
                     apiRef={this._api}
                     optionsRef={this._options}
                     onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))}
+                    onSubmitError={(errors) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: { ok: false, errors } }))}
                 />, this._container);
             } catch (err) {
                 console.error('[custom-dynamic-form] render error:', err);

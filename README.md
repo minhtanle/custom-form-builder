@@ -66,6 +66,7 @@ f.uiSchema = cfg.uiSchema;    // widget + layout (đi kèm schema)
 //     "dang_ky_nhan_tin": true      // checkbox → boolean
 //   };
 // Field trong nhánh conditional đang bị ẩn sẽ KHÔNG xuất hiện trong payload.
+// Có lỗi validate → STILL phát onFormSubmit với e.detail = { ok: false, errors } (xem §4.3).
 
 f.addEventListener('onFormSubmit', (e) =>
   fetch('/api/submit', {
@@ -267,10 +268,21 @@ Gợi ý widget: `text`, `textarea`, `number`, `email`, `url`, `phone`, `date`, 
 
 ### 4.3 Xử lý kết quả submit
 
-Khi form **có lỗi**, engine KHÔNG phát `onFormSubmit`; lỗi tự hiện cạnh từng field (i18n, kiểu `"Vui lòng kiểm tra lại trường [Tên]"`) và không có event/payload lỗi nào khác. Vì thế:
+Khi form **có lỗi** (`handleFormSubmit` trong engine):
 
-- Listener `onFormSubmit` chỉ xử lý nhánh *thành công* — payload `e.detail` đã mô tả ở [Cách sử dụng nhanh](#cách-sử-dụng-nhanh).
-- Mọi lỗi còn thiếu sót phải bị chặn ở **backend** ([§6](#6-validator-php-backend) — 422 + `{field, code, message}`).
+- KHÔNG ngăn submit event listener — `onFormSubmit` **vẫn phát**, với `e.detail = { ok: false, errors: {...} }` để FE chủ động xử lý (log, popup, v.v.):
+  ```js
+  f.addEventListener('onFormSubmit', (e) => {
+    if (e.detail && e.detail.ok === false) {
+      console.error('Form lỗi:', e.detail.errors);  // { field: "msg", ... }
+      return;
+    }
+    // ngược lại: e.detail = dữ liệu form (payload gửi BE)
+  });
+  ```
+- `e.detail.errors` = map `{ fieldName: message }`, lỗi đồng thời được render inline cạnh từng field (i18n).
+- Khi `ok: false` KHÔNG có `data` trong `e.detail`; payload không phải `{ ok: false, ... }` là dữ liệu thành công.
+- Luôn bắt được nhánh lỗi ở FE, nhưng **vẫn phải chặn lại ở backend** ([§6](#6-validator-php-backend) — 422 + `{field, code, message}`) vì form có thể bỏ qua validate client.
 
 ### 4.4 Luồng edit lại thông tin (`formEl.data`)
 
