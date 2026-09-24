@@ -1,8 +1,0 @@
-{
-  "name": "cs/form-validator",
-  "description": "PHP validator for custom-form-builder JSON Schema",
-  "type": "project",
-  "require": {
-    "opis/json-schema": "^2.6"
-  }
-}
