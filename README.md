@@ -68,7 +68,7 @@ f.uiSchema = cfg.uiSchema;    // widget + layout (đi kèm schema)
 //     "dang_ky_nhan_tin": true      // checkbox → boolean
 //   };
 // Field trong nhánh conditional đang bị ẩn sẽ KHÔNG xuất hiện trong payload.
-// Có lỗi validate → STILL phát onFormSubmit với e.detail = { ok: false, errors } (xem §4.3).
+// Có lỗi validate → STILL phát onFormSubmit với e.detail = { isValid: false, errors } (xem §4.3).
 
 f.addEventListener('onFormSubmit', (e) =>
   fetch('/api/submit', {
@@ -196,7 +196,7 @@ custom-form-builder/
 | --- | --- |
 | `schema` / `uiSchema` | JSON Schema + UI Schema (widget + layout + `idPrefix`); setter tự render lại ([4.2](#42-gán-schemauischema-trực-tiếp-bằng-js)). |
 | `data = {…}` | Prefill bản ghi khi sửa — gán 1 lần khi mở form, override `default` ([4.4](#44-luồng-edit-lại-thông-tin-formeldata)). |
-| `submitForm()` | Validate + emit từ nút ngoài form ([4.3](#43-xử-lý-kết-quả-submit)). |
+| `submitForm()` | Validate + hiển thị lỗi inline; trả `{ isValid: true, data }` / `{ isValid: false, errors }` (vẫn phát `onFormSubmit`) ([4.3](#43-xử-lý-kết-quả-submit)). |
 | `setValue(name, value)` | Gán/reset 1 field (không remount form), coerce đúng kiểu + xóa lỗi field đó ([4.6](#46-triển-khai-select-phụ-thuộc-tỉnh-và-xã)). |
 | `setLists({ field: [{ value, label }] })` | Gán options từ API; ưu tiên hơn `oneOf` tĩnh; gọi lại nhiều lần được ([4.5](#45-options-nạp-từ-api-setlists-và-optionkeys)). |
 
@@ -277,10 +277,10 @@ Gợi ý widget: `text`, `textarea`, `number`, `email`, `url`, `phone`, `date`, 
 
 Khi form **có lỗi** (`handleFormSubmit` trong engine):
 
-- KHÔNG ngăn submit event listener — `onFormSubmit` **vẫn phát**, với `e.detail = { ok: false, errors: {...} }` để FE chủ động xử lý (log, popup, v.v.):
+- KHÔNG ngăn submit event listener — `onFormSubmit` **vẫn phát**, với `e.detail = { isValid: false, errors: {...} }` để FE chủ động xử lý (log, popup, v.v.):
   ```js
   f.addEventListener('onFormSubmit', (e) => {
-    if (e.detail && e.detail.ok === false) {
+    if (e.detail && e.detail.isValid === false) {
       console.error('Form lỗi:', e.detail.errors);  // { field: "msg", ... }
       return;
     }
@@ -288,8 +288,24 @@ Khi form **có lỗi** (`handleFormSubmit` trong engine):
   });
   ```
 - `e.detail.errors` = map `{ fieldName: message }`, lỗi đồng thời được render inline cạnh từng field (i18n).
-- Khi `ok: false` KHÔNG có `data` trong `e.detail`; payload không phải `{ ok: false, ... }` là dữ liệu thành công.
+- Khi `isValid: false` KHÔNG có `data` trong `e.detail`; payload không phải `{ isValid: false, ... }` là dữ liệu thành công.
 - Luôn bắt được nhánh lỗi ở FE, nhưng **vẫn phải chặn lại ở backend** ([§6](#6-validator-php-backend) — 422 + `{field, code, message}`) vì form có thể bỏ qua validate client.
+
+Nếu **không muốn dựa vào sự kiện** (nút submit nằm ngoài form của engine), gọi `formEl.submitForm()` — nó validate, hiện lỗi inline như bình thường, **và trả luôn kết quả**:
+
+```js
+const r = formEl.submitForm();
+if (!r.isValid) return;               // r.errors = { field: "msg" } — đã bôi đỏ field lỗi
+fetch('/api/submit', {                // r.data = payload gửi BE (giống e.detail success)
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(r.data),
+});
+```
+
+- `r.data` giống hệt `e.detail` của `onFormSubmit` success; `r.errors` giống hệt `{ isValid: false, errors }`.
+- Event `onFormSubmit` **vẫn phát** song song — code cũ dùng event không ảnh hưởng.
+- `submitForm()` trả `null` nếu chưa gán `schema`/`uiSchema`.
 
 ### 4.4 Luồng edit lại thông tin (`formEl.data`)
 
@@ -385,7 +401,7 @@ Các custom event phát từ `<custom-dynamic-form>` — lắng nghe bằng `add
 
 | Event | Description | Event detail | Emitted when |
 | --- | --- | --- | --- |
-| `onFormSubmit` | Kết quả xử lý submit, thành công hoặc lỗi. | Thành công: `{ field: value, … }` — dữ liệu form đã coerce, là payload gửi BE (không bọc `ok`).<br>Lỗi: `{ ok: false, errors: { field: msg } }`. | Mỗi lần submit (nút trong form hoặc `submitForm()`); kể cả khi validate lỗi. Chi tiết: [4.3](#43-xử-lý-kết-quả-submit). |
+| `onFormSubmit` | Kết quả xử lý submit, thành công hoặc lỗi. | Thành công: `{ field: value, … }` — dữ liệu form đã coerce, là payload gửi BE (không bọc `isValid`).<br>Lỗi: `{ isValid: false, errors: { field: msg } }`. | Mỗi lần submit (nút trong form hoặc `submitForm()`); kể cả khi validate lỗi. Chi tiết: [4.3](#43-xử-lý-kết-quả-submit). |
 | `onFieldChange` | Field thay đổi giá trị. | `{ name: string, value: any }` — tên field + giá trị mới, đã coerce đúng kiểu schema. | User sửa field (input, select, radio, checkbox, slider…). Không phát khi gán qua `data`, `setValue()`, hay field ẩn/hiện theo conditional. |
 
 Ví dụ:

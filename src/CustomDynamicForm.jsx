@@ -526,10 +526,11 @@ function DynamicFormCore({ schema, uiSchema, onSubmit, onSubmitError, onFieldCha
         if (Object.keys(fieldErrors).length === 0) {
             setErrors({});
             onSubmit(payload);
-        } else {
-            setErrors(fieldErrors);
-            if (typeof onSubmitError === 'function') onSubmitError(fieldErrors);
+            return { isValid: true, data: payload };
         }
+        setErrors(fieldErrors);
+        if (typeof onSubmitError === 'function') onSubmitError(fieldErrors);
+        return { isValid: false, errors: fieldErrors };
     };
 
     // API bên ngoài gọi submit trực tiếp (thay cho nút submit bên trong form)
@@ -637,7 +638,7 @@ class CustomDynamicForm extends HTMLElement {
     set data(val) { this._data = val; this._dataKey++; this.renderComponent(); }
 
     submitForm() {
-        if (typeof this._api.submit === 'function') this._api.submit();
+        return typeof this._api.submit === 'function' ? this._api.submit() : null;
     }
 
     setValue(name, value) {
@@ -660,7 +661,7 @@ class CustomDynamicForm extends HTMLElement {
                     apiRef={this._api}
                     optionsRef={this._options}
                     onSubmit={(data) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: data }))}
-                    onSubmitError={(errors) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: { ok: false, errors } }))}
+                    onSubmitError={(errors) => this.dispatchEvent(new CustomEvent('onFormSubmit', { detail: { isValid: false, errors } }))}
                     onFieldChange={(payload) => this.dispatchEvent(new CustomEvent('onFieldChange', { detail: payload }))}
                 />, this._container);
             } catch (err) {

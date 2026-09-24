@@ -1,7 +1,21 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+
+const buildStamp = (mode) => ({
+  name: 'build-stamp',
+  generateBundle(_options, bundle) {
+    const fileName = mode === 'builder' ? 'builder.js' : 'custom-dynamic-form.js';
+    const chunk = bundle[fileName];
+    if (!chunk) return;
+    const time = new Date().toLocaleString('sv-SE');
+    const label = mode === 'builder' ? 'Builder' : 'CustomDynamicForm';
+    chunk.code = `/*! ${label} v${pkg.version} — build ${time} */\n` + chunk.code;
+  }
+});
 
 export default defineConfig(({ mode }) => {
   if (mode === 'builder') {
@@ -57,7 +71,7 @@ export default defineConfig(({ mode }) => {
 
   // Engine lib (iife): src/CustomDynamicForm.jsx -> dist/custom-dynamic-form.js
   return {
-    plugins: [preact()],
+    plugins: [preact(), buildStamp('engine')],
     build: {
       emptyOutDir: false, // giữ build builder đã có trong dist/
       lib: {
