@@ -190,17 +190,278 @@ custom-form-builder/
 - Đăng ký Web Component **`<custom-dynamic-form>`**; CSS nằm trong Shadow DOM → không phụ thuộc CSS của trang chủ.
 - Render theo `formEl.schema` (JSON Schema) + `formEl.uiSchema` (widget + layout + `idPrefix`). Field: `text, number, email, url, phone, textarea, date, select, custom-select, radio, checkbox, hidden, time-slider`; element layout: `heading, paragraph, divider`.
 - Hiện/ẩn field theo điều kiện `if/then` (option con của radio); validate client bằng `@cfworker/json-schema`.
-- API công khai (chi tiết + ví dụ ở §4):
 
-| Thành viên | Mô tả |
-| --- | --- |
-| `schema` / `uiSchema` | JSON Schema + UI Schema (widget + layout + `idPrefix`); setter tự render lại ([4.2](#42-gán-schemauischema-trực-tiếp-bằng-js)). |
-| `data = {…}` | Prefill bản ghi khi sửa — gán 1 lần khi mở form, override `default` ([4.4](#44-luồng-edit-lại-thông-tin-formeldata)). |
-| `submitForm()` | Validate + hiển thị lỗi inline; trả `{ isValid: true, data }` / `{ isValid: false, errors }` (vẫn phát `onFormSubmit`) ([4.3](#43-xử-lý-kết-quả-submit)). |
-| `setValue(name, value)` | Gán/reset 1 field (không remount form), coerce đúng kiểu + xóa lỗi field đó ([4.6](#46-triển-khai-select-phụ-thuộc-tỉnh-và-xã)). |
-| `setLists({ field: [{ value, label }] })` | Gán options từ API; ưu tiên hơn `oneOf` tĩnh; gọi lại nhiều lần được ([4.5](#45-options-nạp-từ-api-setlists-và-optionkeys)). |
+#### Mục lục API — `<custom-dynamic-form>`
 
-- Events: `onFormSubmit` ([4.3](#43-xử-lý-kết-quả-submit)), `onFieldChange` ([4.7](#47-events)).
+- **Properties**: [`schema`](#schema) · [`uiSchema`](#uischema) · [`data`](#data) · [`lang`](#lang)
+- **Methods**: [`submitForm()`](#submitform) · [`setValue(name, value)`](#setvaluename-value) · [`setLists(byField)`](#setlistsbyfield)
+- **Events**: [`onFormSubmit`](#onformsubmit) · [`onFieldChange`](#onfieldchange)
+
+**Ví dụ trong mục này — mặc định có sẵn:**
+
+```html
+<custom-dynamic-form id="f"></custom-dynamic-form>
+```
+
+```js
+const formEl = document.getElementById('f');   // formEl dùng chung cho mọi ví dụ dưới đây
+```
+
+---
+
+#### `schema`
+
+**Mô tả** — gán JSON Schema; setter render lại form ngay (khi `uiSchema` đã gán).
+
+```js
+formEl.schema = {
+  type: 'object',
+  properties: {
+    relation: { type: 'integer', title: 'Đối tượng liên kết', default: 1 },
+    ho_ten:   { type: 'string',  title: 'Họ tên', minLength: 2, maxLength: 50 },
+  },
+  required: ['relation', 'ho_ten'],
+  allOf: [ { if: { properties: { relation: { const: 1 } } }, then: { required: ['ma_nhan_vien'] } } ],
+};
+```
+
+Gán rồi liền `uiSchema` là form render ngay; hoặc gán schema lấy từ API:
+
+```js
+const { schema, uiSchema } = await fetch('/api/form-config').then((r) => r.json());
+formEl.schema = schema;
+formEl.uiSchema = uiSchema;
+```
+
+**Kết quả trả về** — `undefined` (setter).
+
+**Các case:**
+- Widget theo kiểu `properties[name].type`: text, number, email, url, phone, textarea, date, select, custom-select, radio, checkbox, hidden, time-slider.
+- Chưa gán `uiSchema` → form chưa render (hiện loading); gán thêm `uiSchema` là render.
+- Lấy schema từ: Builder export, viết tay, hoặc API cấp cấu hình ([§4.2](#42-gán-schemauischema-trực-tiếp-bằng-js)).
+
+---
+
+#### `uiSchema`
+
+**Mô tả** — widget + layout + `idPrefix` cho schema đã gán.
+
+```js
+formEl.uiSchema = {
+  idPrefix: 'demo',                                        // prefix id input, tránh trùng page
+  fields: {
+    relation: { 'ui:widget': 'radio' },                    // đổi widget (mặc định theo kiểu schema)
+    ho_ten:   { placeholder: 'Nhập họ và tên' },
+  },
+  layout: [
+    { type: 'row', fields: [ { name: 'relation', grid: 12 } ] },
+    { type: 'row', fields: [ { name: 'ho_ten', grid: 6 }, { name: 'gio_ht', grid: 6 } ] },
+    // layout cũng có thể là element: { type: 'heading' | 'paragraph' | 'divider', text: '…' }
+  ],
+};
+```
+
+**Kết quả trả về** — `undefined` (setter).
+
+**Các case:**
+- Không khai `layout` → tự sinh lưới theo thứ tự `schema.properties`.
+- Bỏ `layout` cho field trong nhánh conditional (`then.required`) — engine tự render lồng.
+
+---
+
+#### `data`
+
+**Mô tả** — prefill bản ghi khi sửa edit; gán **đúng 1 lần** khi mở form ([§4.4](#44-luồng-edit-lại-thông-tin-formeldata)).
+
+```js
+// Mở form sửa bản ghi: gán schema/uiSchema rồi gán data — value khớp payload onFormSubmit
+formEl.schema   = cfg.schema;
+formEl.uiSchema = cfg.uiSchema;
+formEl.data = {
+  relation: 2,                    // select/radio → const value
+  gio_ht: 28800,                  // time-slider  → giây (số)
+  ngay_dk: '2026-09-23',          // date         → 'YYYY-MM-DD' (chuỗi)
+  dang_ky_nhan_tin: false,        // checkbox/boolean → false
+};
+```
+
+**Kết quả trả về** — `undefined` (setter).
+
+**Các case:**
+- Key có trong `data` (kể cả `0`/`false`) → dùng giá trị đó; key không có → dùng `default` hoặc rỗng.
+- Giá trị tự coerce đúng kiểu theo `schema.properties`.
+- Mỗi lần gán `data` = **remount** core (state khởi tạo lại từ data).
+
+---
+
+#### `lang`
+
+**Mô tả** — attribute chuẩn của HTMLElement; đổi ngôn ngữ i18n của engine.
+
+```js
+// Đổi ngôn ngữ theo lựa chọn của người dùng
+document.querySelector('#lang-switch').addEventListener('change', (e) => {
+  formEl.lang = e.target.value;          // 'vi' | 'en' (mặc định '') — render lại toàn bộ
+});
+```
+
+**Kết quả trả về** — `undefined` (attribute).
+
+**Các case:**
+- Ngôn ngữ lỗi validate lấy từ `src/i18n.js`.
+
+---
+
+#### `submitForm()`
+
+**Mô tả** — cách dùng với nút submit ngoài form (validate + bôi đỏ lỗi inline + phát `onFormSubmit`, chi tiết [§4.3](#43-xử-lý-kết-quả-submit)).
+
+**Tham số** — không có.
+
+```js
+// Nút submit đặt NGOÀI <custom-dynamic-form>:
+document.querySelector('#btn-submit').addEventListener('click', () => {
+  const r = formEl.submitForm();
+
+  if (!r.isValid) {
+    // r.errors = { fieldName: "message" } — lỗi đã bôi đỏ inline, dừng không gửi
+    console.warn('Form chưa hợp lệ:', r.errors);
+    return;
+  }
+  // r.isValid === true
+  // r.data = { field: value, ... } — chỉ field đang hiển thị, đã ép đúng kiểu
+  fetch('/api/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(r.data),
+  });
+});
+```
+
+**Kết quả trả về** — các trường hợp:
+
+```js
+const r = formEl.submitForm();
+
+// → { isValid: true, data }                     HỢP LỆ
+//     data = { field: value, ... }  chỉ field đang hiển thị, đã ép đúng kiểu
+//                                    (number → số, boolean → true/false,
+//                                     time-slider → giây, date → 'YYYY-MM-DD')
+
+// → { isValid: false, errors }                  LỖI VALIDATE
+//     errors = { fieldName: "message" }  lỗi đồng thời render inline
+//     onFormSubmit vẫn phát detail = { isValid: false, errors }
+
+// → null                                        CHƯA GÁN schema / uiSchema
+```
+
+- Nút submit bên trong form (nếu có) cũng đi qua cùng luồng — không cần return.
+
+---
+
+#### `setValue(name, value)`
+
+**Mô tả** — gán/reset 1 field từ bên ngoài; ví dụ điển hình: đổi Tỉnh phải reset Xã ([§4.6](#46-triển-khai-select-phụ-thuộc-tỉnh-và-xã)).
+
+```js
+// Luồng "Tỉnh → Xã": khi user đổi Tỉnh thì reset Xã cũ rồi mới nạp list Xã mới
+formEl.addEventListener('onFieldChange', ({ detail }) => {
+  if (detail.name !== 'tinh') return;
+
+  formEl.setValue('xa', '');                       // reset Xã cũ + xóa lỗi Xã (không remount)
+  if (!detail.value) { formEl.setLists({ xa: [] }); return; }
+
+  const xaList = await fetch(`/api/xa?tinh=${encodeURIComponent(detail.value)}`).then((r) => r.json());
+  formEl.setLists({ xa: xaList });
+});
+```
+
+**Tham số:**
+- `name` — `string`: key field, cần có trong `schema.properties`.
+- `value` — giá trị mới theo kiểu field (tự coerce).
+
+**Kết quả trả về** — `undefined`.
+
+**Các case:**
+- KHÔNG remount form (khác `data`).
+- Xóa lỗi của field đó; không đụng lỗi field khác.
+- KHÔNG phát sự kiện `onFieldChange`.
+- No-op nếu form chưa render (chưa gán `schema`/`uiSchema`).
+
+---
+
+#### `setLists(byField)`
+
+**Mô tả** — gán options runtime cho select/radio "Dữ liệu từ API" ([§4.5](#45-options-nạp-từ-api-setlists-và-optionkeys)).
+
+```js
+// Nạp list trước khi render form (hoặc khi user đổi Tỉnh):
+const tinh = await fetch('/api/tinh').then((r) => r.json());
+// tinh = [ { value: '01', label: 'Hà Nội' }, { value: '79', label: 'TP. Hồ Chí Minh' }, ... ]
+
+formEl.setLists({ tinh });
+```
+
+**Tham số** — `byField`: `{ [fieldName]: Array<{ value: string, label: string }> }`.
+
+**Kết quả trả về** — `undefined`.
+
+**Các case:**
+- List runtime **ưu tiên hơn** `oneOf` tĩnh; gọi lại nhiều lần được, form render ngay list mới.
+- Tự chuẩn hóa: chuỗi hóa `value`, dedup theo `value`, bỏ item thiếu `value`.
+- Nên chỉ gọi cho field nằm trong `optionKeys`.
+- Chưa gọi `setLists` → select/custom-select hiện "-- Chọn --".
+
+---
+
+#### `onFormSubmit`
+
+**Mô tả** — kết quả xử lý submit (thành công hoặc lỗi).
+
+```js
+// Cách phổ biến nhất: gửi dữ liệu form lên BE khi submit (không cần nút ngoài)
+formEl.addEventListener('onFormSubmit', async (e) => {
+  if (e.detail && e.detail.isValid === false) {
+    // e.detail = { isValid: false, errors: { fieldName: "message" } }   — LỖI
+    // (lỗi đã render inline; ở đây có thể log/popup)
+    console.error('Form lỗi:', e.detail.errors);
+    return;
+  }
+  // e.detail = { field: value, ... } — toàn bộ dữ liệu đã coerce, payload gửi BE — HỢP LỆ
+  await fetch('/api/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(e.detail),
+  });
+});
+```
+
+**Khi phát:**
+- Mỗi lần submit — nút trong form hoặc `formEl.submitForm()`; **kể cả khi validate lỗi**.
+- Nghe trực tiếp trên element.
+
+---
+
+#### `onFieldChange`
+
+**Mô tả** — field thay đổi giá trị do user thao tác.
+
+```js
+// Log mọi thay đổi field — vd: "tinh = 01"
+formEl.addEventListener('onFieldChange', ({ detail }) => {
+  const { name, value } = detail;
+  console.log(`${name} = ${value}`);
+  // detail = { name: "tinh", value: "01" } — value đã coerce đúng kiểu theo schema
+});
+```
+
+**Các case:**
+- Phát khi user: gõ input/textarea, chọn select/radio/custom-select, bật checkbox, kéo time-slider… (mọi field).
+- KHÔNG phát khi gán qua `formEl.data`, `formEl.setValue()`, hay field ẩn/hiện theo conditional.
+- Chọn lại đúng giá trị cũ vẫn phát (chưa dedup) — app tự lọc theo `detail.name`.
+- KHÔNG có `prevValue`/`formData` trong detail — cần giá trị cũ thì tự giữ map.
+
+Lưu ý chung events: phát với `bubbles:false, composed:false` → **phải `addEventListener` trực tiếp trên element** (dùng `document.getElementById`, không qua wrapper/document — tránh listener hụt).
 
 ### 3.2 Builder
 
